@@ -5,10 +5,8 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel, ValidationError
 from google import genai
 from google.genai import types
+from structures import Analysis, Summarise
 
-SYSTEM_PROMPT = """
-You are a helpful assistant.
-"""
 
 class ChatCompletionBase(ABC):
     """
@@ -45,7 +43,6 @@ class ChatCompletionBase(ABC):
         try:
             with open(config_path, 'r') as file:
                 config = yaml.safe_load(file)
-            print("config", config ,"\n\n")
             return config
         except FileNotFoundError:
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
@@ -66,8 +63,7 @@ class ChatCompletionBase(ABC):
     
     def invoke_model(
         self,
-        user_query: str,
-        specialisation_prompt: str,
+        input: Any,
         request_format: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Union[str, Any]:
@@ -75,19 +71,50 @@ class ChatCompletionBase(ABC):
         Invoke the Gemini model with the given inputs.
         
         Args:
-            user_query (str): The user's query/message
-            specialisation_prompt (str): Specialization prompt for the model
+            input (Any): Input data - can be Analysis or Summarise Pydantic model
             request_format (Optional[Dict[str, Any]]): Dict with 'type' and 'schema' for structured output
             **kwargs: Additional parameters for the model call
             
         Returns:
             Union[str, Any]: Model response (string or structured object)
         """
-        # Prepare the content by combining prompts
-        content = f"{specialisation_prompt}\n\n{user_query}"
+        
+        # Determine input type and prepare content accordingly
+        if hasattr(input, '__class__') and input.__class__.__name__ == 'Analysis':
+            # For Analysis: combine specialised_prompt, user_query, and memory
+            content = f"{input.specialised_prompt}\n\nUser Query: {input.user_query}\n\nMemory Context: {input.memory}"
+            system_prompt = """
+                You are a compassionate and supportive mental wellness assistant.
+
+                Instructions:
+                - If the specialised_prompt contains the word 'THERAPIST', you must tell the user to consult a therapist for further help.
+                - If the specialised_prompt is general (such as a greeting like 'hi') or requests a generalised reply, respond warmly and politely, and use the memory context to make your reply more personal and relevant.
+                - Only answer questions related to mental health, mental wellness, emotional well-being, or healthy lifestyle habits (such as exercise, stress management, or self-care). Do NOT answer questions outside of these topics.
+                - If the user's question is not related to mental wellness or healthcare, politely inform them that you are a mental wellness assistant and cannot answer unrelated questions, but ask a gentle follow-up question to guide the conversation back to mental wellness.
+                - Always analyze the previous conversation provided in 'memory' to understand the user's background and context, and use this knowledge to make your responses more helpful and empathetic.
+                - Never provide medical or legal advice.
+                - If the user expresses thoughts of self-harm or harm to others, gently encourage contacting a therapist or emergency help.
+
+                Your tone should be friendly, respectful, and non-judgmental.
+                """
+            
+        elif hasattr(input, '__class__') and input.__class__.__name__ == 'Summarise':
+            # For Summarise: use only chat_history
+            content = f"Chat History: {input.chat_history}"
+            system_prompt = (
+                "You are a helpful assistant that summarizes chat conversations. "
+                "Your summary should include: "
+                "1. The overall mental health status of the user as inferred from the conversation. "
+                "2. Any important information about the user, such as their concerns, emotional state, or recurring themes. "
+                "3. Key details that would be useful as memory for future conversations to provide more personalized and supportive responses. "
+                "Be concise, objective, and empathetic in your summary."
+            )
+            
+        else:
+            raise ValueError("Input must be either Analysis or Summarise Pydantic model")
         
         # Prepare generation config with system prompt
-        generation_config = self._prepare_generation_config(request_format, **kwargs)
+        generation_config = self._prepare_generation_config(system_prompt, request_format, **kwargs)
         
         # Make the API call
         try:
@@ -104,6 +131,7 @@ class ChatCompletionBase(ABC):
     
     def _prepare_generation_config(
         self,
+        system_prompt: str,
         request_format: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> types.GenerateContentConfig:
@@ -141,7 +169,7 @@ class ChatCompletionBase(ABC):
         )
         
         # Add system instruction from global constant
-        generation_config.system_instruction = SYSTEM_PROMPT
+        generation_config.system_instruction = system_prompt
         
         # Handle structured output if request_format is provided
         if request_format:
@@ -159,7 +187,6 @@ class ChatCompletionBase(ABC):
                 generation_config.response_schema = schema.__args__[0]
             else:
                 generation_config.response_schema = schema
-        print("generation config",generation_config,"\n\n")
         return generation_config
     
     def _make_api_call(
@@ -193,7 +220,6 @@ class ChatCompletionBase(ABC):
         Returns:
             str: Processed text response
         """
-        print("text response", response,"\n\n")
         return response.text
     
     def _process_structured_response(
@@ -210,7 +236,6 @@ class ChatCompletionBase(ABC):
             Any: Processed structured response
         """
         try:
-            print("structured response", response,"\n\n")
             return response.parsed
         except Exception as e:
             raise ValidationError(f"Failed to parse structured response: {e}")
@@ -252,17 +277,29 @@ if __name__ == "__main__":
         # Create chat completion instance
         chat = ChatCompletionBase("config.yaml")
         
-        # Simple text response
-        response = chat.invoke_model(
+        # Example Analysis input
+        analysis_input = Analysis(
             user_query="What is machine learning?",
-            specialisation_prompt="You are an AI expert."
+            specialised_prompt="You are an AI expert.",
+            memory={"previous_context": "User has been asking about AI topics"}
         )
-        print("Text Response:", response)
+        
+        # Analysis response
+        analysis_response = chat.invoke_model(analysis_input)
+        print("Analysis Response:", analysis_response)
+        
+        # Example Summarise input
+        summarise_input = Summarise(
+            chat_history={"messages": ["Hello", "How are you?", "I'm doing well, thanks!"]}
+        )
+        
+        # Summarise response
+        summarise_response = chat.invoke_model(summarise_input)
+        print("Summarise Response:", summarise_response)
         
         # Structured response with schema
         structured_response = chat.invoke_model(
-            user_query="List a few popular cookie recipes, and include the amounts of ingredients.",
-            specialisation_prompt="You are a cooking expert.",
+            analysis_input,
             request_format={
                 "type": "list",
                 "schema": Recipe
