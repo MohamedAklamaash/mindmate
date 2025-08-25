@@ -1,17 +1,13 @@
-# Google Gemini Model Configuration
 model_name: "gemini-2.5-flash"
-api_key: "AIzaSyD2xww3jm4fybfzTyGSLFbVGPVgDmWRbG0"
+api_key: "YOUR_API_KEY_HERE"
 
-# Required generation parameters
+# Generation parameters used by chat.py
 temperature: 0.7
 top_p: 1.0
 top_k: 40
-max_output_tokens: 1000
-
-# Optional additional configuration
-frequency_penalty: 0.0
-presence_penalty: 0.0
 candidate_count: 1
+presence_penalty: 0.0
+frequency_penalty: 0.0
 
-# Provider specific settings
-provider: "gemini"
+# ChatBot behavior
+summary_threshold: 11
