@@ -1,0 +1,7 @@
+.env
+.env.*
+**/.env
+**/.env.*
+chatbot/test.py
+chatbot/test2.py
+# Ignore any file or folder named .env anywhere
