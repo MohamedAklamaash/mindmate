@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useUserStore } from '@/store/userStore';
 
-export default function HomeScreen() {
+export default function ChatScreen() {
   const userType = useUserStore((state) => state.userType);
 
   // Add debugging to track when component renders and what userType value is
@@ -14,7 +14,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.welcomeText}>
-        {userType === 'user' ? 'Welcome User!' : userType === 'therapist' ? 'Welcome Therapist!' : 'Please select a user type'}
+        {userType === 'user' ? 'Welcome To the Chat Screen!' : userType === 'therapist' ? 'Welcome Therapist!' : 'Please select a user type'}
       </Text>
       
       {/* Add this to confirm the current userType value */}

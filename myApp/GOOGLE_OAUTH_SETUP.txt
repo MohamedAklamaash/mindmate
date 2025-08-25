@@ -1,0 +1,28 @@
+// When you get your web client ID, replace the demo mode with this:
+
+const [request, response, promptAsync] = AuthSession.useAuthRequest(
+  {
+    clientId: 'YOUR_NEW_WEB_CLIENT_ID.apps.googleusercontent.com', // Replace with your web client ID
+    scopes: ['openid', 'profile', 'email'],
+    redirectUri: AuthSession.makeRedirectUri(),
+    responseType: AuthSession.ResponseType.Token,
+  },
+  {
+    authorizationEndpoint: 'https://accounts.google.com/oauth/authorize',
+  }
+);
+
+// Then replace the openGoogleSetupInstructions function with:
+const signIn = async () => {
+  setLoading(true);
+  try {
+    await promptAsync();
+  } catch (error) {
+    console.error('Sign in error:', error);
+    Alert.alert('Error', 'Failed to initiate sign in');
+  } finally {
+    setLoading(false);
+  }
+};
+
+// And update the button onPress to: onPress={signIn}
