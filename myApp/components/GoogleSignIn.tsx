@@ -1,23 +1,73 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar,View, Text, TouchableOpacity, StyleSheet, Alert, Linking, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AntDesign } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 import { useUserStore } from '../store/userStore';
-
+import { StatusBar } from 'expo-status-bar';
 // Complete the auth session for proper cleanup
 WebBrowser.maybeCompleteAuthSession();
 
 export function GoogleSignIn() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { setUser, setAuthenticated, setUserType } = useUserStore();
+  const { setUser, setAuthenticated, setUserType, setNeedsNickname } = useUserStore();
+  const extra = (Constants.expoConfig?.extra || {}) as any;
+  const ANDROID_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || extra.GOOGLE_ANDROID_CLIENT_ID;
+  const IOS_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || extra.GOOGLE_IOS_CLIENT_ID;
+  const WEB_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || extra.GOOGLE_WEB_CLIENT_ID;
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: ANDROID_ID,
+    iosClientId: IOS_ID,
+    webClientId: WEB_ID,
+    scopes: ['openid', 'profile', 'email'],
+  });
    useEffect(() => {
       // Hide the status bar on mount
-      StatusBar.setHidden(true);
+<StatusBar hidden={true} />
+      GoogleSignin.configure({
+        webClientId: WEB_ID || undefined,
+        offlineAccess: false,
+      });
     }, []);
+
+  useEffect(() => {
+    const completeLogin = async () => {
+      if (response?.type === 'success') {
+        try {
+          const accessToken = response.authentication?.accessToken;
+          if (!accessToken) return;
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          const profile = await res.json();
+          setUser({
+            id: profile.sub ?? String(Date.now()),
+            email: profile.email ?? null,
+            name: profile.name ?? null,
+            photoURL: profile.picture ?? null,
+          });
+          // Collect nickname next
+          setAuthenticated(false);
+          setNeedsNickname(true);
+        } catch (e) {
+          console.error('Failed to fetch user info', e);
+          Alert.alert('Error', 'Could not complete Google Sign-In');
+        } finally {
+          setLoading(false);
+        }
+      } else if (response?.type === 'error') {
+        setLoading(false);
+        Alert.alert('Sign-In cancelled');
+      }
+    };
+    completeLogin();
+  }, [response]);
 
   // For Expo development, we'll use a temporary solution
   const handleWebSignIn = async () => {
@@ -44,7 +94,9 @@ export function GoogleSignIn() {
                 name: 'Demo User',
                 photoURL: null,
               });
+              // In demo mode, go straight to the welcome screen
               setAuthenticated(true);
+              setNeedsNickname(false);
               router.replace('/(tabs)');
               setLoading(false);
             },
@@ -58,25 +110,38 @@ export function GoogleSignIn() {
     }
   };
 
-  const openGoogleSetupInstructions = () => {
-    Alert.alert(
-      'Google OAuth Setup Required',
-      'To enable Google Sign-In, you need to:\n\n1. Go to Google Cloud Console\n2. Create a Web Application OAuth client\n3. Add redirect URIs\n4. Update the client ID in the code\n\nFor now, you can use the demo mode to test the app.',
-      [
-        {
-          text: 'Open Google Console',
-          onPress: () => Linking.openURL('https://console.cloud.google.com/apis/credentials'),
-        },
-        {
-          text: 'Use Demo Mode',
-          onPress: handleWebSignIn,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+  const openGoogleSetupInstructions = async () => {
+    if (!ANDROID_ID) {
+      // Fallback to Google Play Services sign-in using google-services.json
+      try {
+        setLoading(true);
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const result = (await GoogleSignin.signIn()) as any;
+        const profile = result?.user ?? result;
+        setUser({
+          id: profile.id || String(Date.now()),
+          email: profile.email || null,
+          name: profile.name || null,
+          photoURL: (profile.photo as any) || null,
+        });
+        setAuthenticated(false);
+        setNeedsNickname(true);
+      } catch (e) {
+        console.error('GoogleSignIn (native) failed', e);
+        Alert.alert('Error', 'Failed to sign in with Google on device');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    try {
+      setLoading(true);
+      await promptAsync();
+    } catch (e) {
+      console.error('Google prompt failed', e);
+      Alert.alert('Error', 'Failed to open Google Sign-In');
+      setLoading(false);
+    }
   };
 
   const handleBackPress = () => {
@@ -90,6 +155,7 @@ export function GoogleSignIn() {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
+        <StatusBar hidden={true} />
         {/* Back Button */}
         <View style={styles.headerContainer}>
           <Pressable 

@@ -29,9 +29,13 @@ type UserStore = {
   user: User | null;
   isAuthenticated: boolean;
   hydrated: boolean;
+  needsNickname: boolean;
+  onboardingStage: 'none' | 'nickname' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen';
   setUserType: (type: 'user' | 'therapist') => void;
   setUser: (user: User | null) => void;
   setAuthenticated: (isAuthenticated: boolean) => void;
+  setNeedsNickname: (needs: boolean) => void;
+  setOnboardingStage: (stage: 'none' | 'nickname' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
   signOut: () => void;
 };
 
@@ -43,9 +47,13 @@ export const useUserStore = create<UserStore>()(
       user: null,
       isAuthenticated: false,
       hydrated: false,
+      needsNickname: false,
+      onboardingStage: 'none',
       setUserType: (type) => set({ userType: type }),
       setUser: (user) => set({ user }),
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
+      setNeedsNickname: (needs) => set({ needsNickname: needs }),
+      setOnboardingStage: (stage) => set({ onboardingStage: stage }),
       signOut: () => set({ user: null, isAuthenticated: false }),
     }),
     {
