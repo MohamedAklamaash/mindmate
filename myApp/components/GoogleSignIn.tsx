@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
+import { StatusBar,View, Text, TouchableOpacity, StyleSheet, Alert, Linking, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AntDesign } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { useUserStore } from '../store/userStore';
@@ -11,7 +13,11 @@ WebBrowser.maybeCompleteAuthSession();
 export function GoogleSignIn() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { setUser, setAuthenticated } = useUserStore();
+  const { setUser, setAuthenticated, setUserType } = useUserStore();
+   useEffect(() => {
+      // Hide the status bar on mount
+      StatusBar.setHidden(true);
+    }, []);
 
   // For Expo development, we'll use a temporary solution
   const handleWebSignIn = async () => {
@@ -73,151 +79,233 @@ export function GoogleSignIn() {
     );
   };
 
+  const handleBackPress = () => {
+    // Reset user type to show SplashScreen
+    setUserType(null as any);
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>🔐 Sign in to MindMate</Text>
-        <Text style={styles.subtitle}>
-          Please sign in with your Google account to continue and access your personalized mental wellness journey.
-        </Text>
-        
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.googleButton, loading && styles.googleButtonDisabled]}
-            onPress={openGoogleSetupInstructions}
-            disabled={loading}
+    <LinearGradient
+      colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        {/* Back Button */}
+        <View style={styles.headerContainer}>
+          <Pressable 
+            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            onPress={handleBackPress}
           >
-            <View style={styles.googleIcon}>
-              <Text style={styles.googleIconText}>G</Text>
-            </View>
-            <Text style={styles.buttonText}>
-              {loading ? 'Signing in...' : 'Sign in with Google'}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.demoButton}
-            onPress={handleWebSignIn}
-            disabled={loading}
-          >
-            <Text style={styles.demoButtonText}>
-              Use Demo Mode (For Testing)
-            </Text>
-          </TouchableOpacity>
+            <AntDesign name="close" size={24} color="#374151" />
+          </Pressable>
         </View>
         
-        <Text style={styles.privacyText}>
-          By signing in, you agree to our privacy policy and terms of service.
-        </Text>
-      </View>
-    </View>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <View style={styles.headerSection}>
+              {/* Heart Icon Container */}
+              <LinearGradient
+                colors={['#60A5FA', '#A78BFA']}
+                style={styles.iconContainer}
+              >
+                <AntDesign name="hearto" size={40} color="white" />
+              </LinearGradient>
+              
+              <Text style={styles.title}>Welcome to MindMate</Text>
+              <Text style={styles.subtitle}>
+                Let's get you started on your wellness journey
+              </Text>
+            </View>
+            
+            <View style={styles.optionsSection}>
+              <Text style={styles.signupText}>How would you like to sign up?</Text>
+              
+              <View style={styles.buttonsContainer}>
+                {/* Google Sign-in Button */}
+                <Pressable 
+                  style={styles.buttonWrapper}
+                  onPress={openGoogleSetupInstructions}
+                  disabled={loading}
+                >
+                  {({ pressed }) => (
+                    <LinearGradient
+                      colors={['#60A5FA', '#A78BFA']}
+                      style={[styles.gradientButton, loading && styles.gradientButtonDisabled, pressed && styles.gradientButtonPressed]}
+                    >
+                      <View style={styles.buttonContent}>
+                        <AntDesign name="google" size={24} color="white" />
+                        <Text style={styles.buttonTitle}>
+                          {loading ? 'Signing in...' : 'Continue with Google'}
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  )}
+                </Pressable>
+                
+                {/* Demo Mode Button */}
+                <Pressable 
+                  style={styles.buttonWrapper}
+                  onPress={handleWebSignIn}
+                  disabled={loading}
+                >
+                  {({ pressed }) => (
+                    <LinearGradient
+                      colors={['#A78BFA', '#F472B6']}
+                      style={[styles.gradientButton, loading && styles.gradientButtonDisabled, pressed && styles.gradientButtonPressed]}
+                    >
+                      <View style={styles.buttonContent}>
+                        <AntDesign name="user" size={24} color="white" />
+                        <Text style={styles.buttonTitle}>Use Demo Mode (For Testing)</Text>
+                      </View>
+                    </LinearGradient>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.privacySection}>
+              <Text style={styles.privacyText}>
+                By continuing, you agree to our Terms of Service and Privacy Policy
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
   },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 30,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    width: '100%',
-    maxWidth: 400,
+  safeArea: {
+    flex: 1,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 30,
-  },
-  buttonContainer: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  googleButton: {
+  headerContainer: {
     flexDirection: 'row',
-    backgroundColor: '#4285F4',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 5,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
-    width: '100%',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  googleButtonDisabled: {
-    backgroundColor: '#ccc',
+  backButtonPressed: {
+    opacity: 0.85,
   },
-  googleIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 12,
-    backgroundColor: 'white',
-    borderRadius: 12,
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    maxWidth: 400,
+    alignSelf: 'center',
+    width: '100%',
   },
-  googleIconText: {
-    color: '#4285F4',
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+    paddingTop: 0,
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 20,
   },
-  buttonText: {
-    color: 'white',
+  optionsSection: {
+    width: '100%',
+    marginVertical: 20,
+  },
+  signupText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  buttonsContainer: {
+    gap: 16,
+  },
+  buttonWrapper: {
+    width: '100%',
+  },
+  gradientButton: {
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  gradientButtonPressed: {
+    opacity: 0.85,
+  },
+  gradientButtonDisabled: {
+    opacity: 0.6,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  buttonTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
+  },
+  privacySection: {
+    alignItems: 'center',
+    marginTop: 32,
   },
   privacyText: {
     fontSize: 12,
-    color: '#999',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 16,
-  },
-  debugButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 15,
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  demoButton: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-  },
-  demoButtonText: {
-    color: '#6c757d',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });

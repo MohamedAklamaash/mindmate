@@ -19,6 +19,8 @@ export default function RootLayout() {
   const userType = useUserStore((state) => state.userType);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
 
+  console.log('RootLayout render - userType:', userType);
+
   if (!loaded) {
     // Async font loading only occurs in development.
     return null;

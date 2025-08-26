@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import React ,{useEffect}from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView ,StatusBar, Pressable} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUserStore } from '../store/userStore';
@@ -10,6 +10,10 @@ export function SplashScreen() {
   const handleLogin = (type: 'user' | 'therapist') => {
     setUserType(type);
   };
+  useEffect(() => {
+    // Hide the status bar on mount
+    StatusBar.setHidden(true);
+  }, []);
 
   return (
     <LinearGradient
@@ -42,42 +46,46 @@ export function SplashScreen() {
               
               <View style={styles.buttonsContainer}>
                 {/* User Button */}
-                <TouchableOpacity 
+                <Pressable 
                   style={styles.buttonWrapper}
                   onPress={() => handleLogin('user')}
                 >
-                  <LinearGradient
-                    colors={['#60A5FA', '#A78BFA']}
-                    style={styles.gradientButton}
-                  >
-                    <View style={styles.buttonContent}>
-                      <MaterialCommunityIcons name="account" size={24} color="white" />
-                      <View style={styles.buttonTextContainer}>
-                        <Text style={styles.buttonTitle}>Continue as User</Text>
-                        <Text style={styles.buttonDescription}>Access AI support & book therapist sessions</Text>
+                  {({ pressed }) => (
+                    <LinearGradient
+                      colors={['#60A5FA', '#A78BFA']}
+                      style={[styles.gradientButton, pressed && styles.gradientButtonPressed]}
+                    >
+                      <View style={styles.buttonContent}>
+                        <MaterialCommunityIcons name="account" size={24} color="white" />
+                        <View style={styles.buttonTextContainer}>
+                          <Text style={styles.buttonTitle}>Continue as User</Text>
+                          <Text style={styles.buttonDescription}>Access AI support & book therapist sessions</Text>
+                        </View>
                       </View>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    </LinearGradient>
+                  )}
+                </Pressable>
                 
                 {/* Therapist Button */}
-                <TouchableOpacity 
+                <Pressable 
                   style={styles.buttonWrapper}
                   onPress={() => handleLogin('therapist')}
                 >
-                  <LinearGradient
-                    colors={['#A78BFA', '#F472B6']}
-                    style={styles.gradientButton}
-                  >
-                    <View style={styles.buttonContent}>
-                      <MaterialCommunityIcons name="stethoscope" size={24} color="white" />
-                      <View style={styles.buttonTextContainer}>
-                        <Text style={styles.buttonTitle}>Continue as Therapist</Text>
-                        <Text style={styles.buttonDescription}>Manage clients & conduct therapy sessions</Text>
+                  {({ pressed }) => (
+                    <LinearGradient
+                      colors={['#A78BFA', '#F472B6']}
+                      style={[styles.gradientButton, pressed && styles.gradientButtonPressed]}
+                    >
+                      <View style={styles.buttonContent}>
+                        <MaterialCommunityIcons name="stethoscope" size={24} color="white" />
+                        <View style={styles.buttonTextContainer}>
+                          <Text style={styles.buttonTitle}>Continue as Therapist</Text>
+                          <Text style={styles.buttonDescription}>Manage clients & conduct therapy sessions</Text>
+                        </View>
                       </View>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    </LinearGradient>
+                  )}
+                </Pressable>
               </View>
             </View>
 
@@ -171,6 +179,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 6,
+  },
+  gradientButtonPressed: {
+    opacity: 0.85,
   },
   buttonTouchable: {
     width: '100%',
