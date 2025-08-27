@@ -1,4 +1,5 @@
 package com.anonymous.myApp
+import com.anonymous.myApp.usage.UsagePackage   
 
 import android.app.Application
 import android.content.res.Configuration
@@ -22,9 +23,10 @@ class MainApplication : Application(), ReactApplication {
         this,
         object : DefaultReactNativeHost(this) {
           override fun getPackages(): List<ReactPackage> {
-            val packages = PackageList(this).packages
+            val packages = PackageList(this).packages.toMutableList()
             // Packages that cannot be autolinked yet can be added manually here, for example:
             // packages.add(MyReactNativePackage())
+            packages.add(UsagePackage())  // Add our custom package
             return packages
           }
 

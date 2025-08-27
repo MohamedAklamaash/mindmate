@@ -1,444 +1,622 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Button, FlatList } from 'react-native';
-import UsageStats from 'react-native-usage-stats';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  Alert,
+  SafeAreaView,
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
+  Linking,
+} from 'react-native';
+import { NativeModules } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-interface UsageStatsItem {
+const { UsageModule } = NativeModules;
+
+interface AppUsage {
   packageName: string;
-  usageTime: number;
-  firstTimeStamp?: number;
-  lastTimeStamp?: number;
-  lastTimeUsed?: number;
+  totalTimeForeground: number;
+  lastTimeUsed: string;
 }
 
-// Type assertion to handle the mismatch between UsageStatsInfo and UsageStatsItem
-type UsageStatsInfo = UsageStatsItem[];
+interface UsageStats {
+  appName: string;
+  packageName: string;
+  timeSpent: number;
+  lastUsed: string;
+  percentage: number;
+  uniqueKey: string;
+}
 
-export default function App() {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null); // null = initial loading state
-  const [usageData, setUsageData] = useState<UsageStatsItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
-  const [hasShownWelcome, setHasShownWelcome] = useState(false);
+export default function ExploreScreen() {
+  const [usageData, setUsageData] = useState<UsageStats[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [totalTime, setTotalTime] = useState(0);
+  const [hasPermission, setHasPermission] = useState(false);
+  const [permissionChecked, setPermissionChecked] = useState(false);
 
-  // Handle splash screen and permission check on mount
-  useEffect(() => {
-    // Show splash screen for 2 seconds
-    const splashTimer = setTimeout(() => {
-      setShowSplash(false);
-      setHasShownWelcome(true);
-      // After splash, check permission and auto-request if needed
-      checkPermissionStatus();
-    }, 2000);
-
-    return () => clearTimeout(splashTimer);
-  }, []);
-
-  const checkPermissionStatus = async () => {
+  const checkUsagePermission = async () => {
+    console.log('🔍 Checking usage permission...');
     try {
-      // Add a small delay to prevent flickering
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (!UsageModule) {
+        console.log('❌ UsageModule not found');
+        setHasPermission(false);
+        setPermissionChecked(true);
+        return;
+      }
+
+      console.log('📱 UsageModule found, checking permission...');
       
-      const result = await UsageStats.checkPermission();
-      setHasPermission(result);
-      
-      if (result) {
-        testDataAccess();
+      // Check if the module has a permission checking method
+      if (UsageModule.hasUsageStatsPermission) {
+        console.log('🔐 Using hasUsageStatsPermission method...');
+        const permission = await UsageModule.hasUsageStatsPermission();
+        console.log('🔐 Permission result:', permission);
+        setHasPermission(permission);
       } else {
-        // Auto-request permission if not granted
-        setTimeout(() => {
-          requestPermission();
-        }, 500);
-      }
-    } catch (error) {
-      console.error('Error checking permission:', error);
-      setHasPermission(false);
-    } finally {
-      setIsInitialized(true);
-    }
-  };
-
-  const testDataAccess = async () => {
-    try {
-      const testStats = await UsageStats.getAppUsageInfo();
-      // Silent test - no logging needed
-    } catch (error) {
-      console.error('Test data access failed:', error);
-    }
-  };
-
-  // Format time in a readable way
-  const formatTime = (milliseconds: number) => {
-    const seconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
-  };
-
-  const requestPermission = () => {
-    try {
-      // Show a brief message before opening settings
-      if (!hasShownWelcome) {
-        // This is the first time, show a more welcoming message
-        console.log('First time setup: Opening permission settings...');
-      }
-      
-      UsageStats.openUsageAccessSettings('com.anonymous.myApp');
-    } catch (error) {
-      console.error('Error opening settings:', error);
-      try {
-        UsageStats.openUsageAccessSettings('');
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-      }
-    }
-  };
-
-const getUsageStats = async () => {
-  setIsLoading(true);
-  setError(null);
-
-  try {
-    const now = new Date();
-    const endTime = now.getTime();
-
-    // Start of today (12 AM)
-    const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
-
-    // Fetch all usage stats and filter by time on our side
-    let stats: UsageStatsItem[] = [];
-    try {
-      const rawStats = await UsageStats.getAppUsageInfo();
-      if (rawStats) {
-        stats = rawStats as unknown as UsageStatsItem[];
-        
-        // Filter stats to only include data from 12 AM today onwards
-        console.log('Total apps found:', stats.length);
-        console.log('Filtering from timestamp:', new Date(startTime).toLocaleString());
-        
-        const filteredStats = stats.filter(item => {
-          if (item.lastTimeUsed) {
-            const isAfterMidnight = item.lastTimeUsed >= startTime;
-            if (isAfterMidnight) {
-              console.log('✅ App used today:', item.packageName, 'at', new Date(item.lastTimeUsed).toLocaleString());
-            }
-            return isAfterMidnight;
-          }
-          return false;
-        });
-        
-        console.log('Apps used since 12 AM today:', filteredStats.length);
-        stats = filteredStats;
-      }
-    } catch (error) {
-      console.error('Error fetching usage stats:', error);
-      setError('Failed to fetch usage stats. Make sure permission is granted.');
-      setUsageData([]);
-      setIsLoading(false);
-      return;
-    }
-
-    if (!stats || stats.length === 0) {
-      setError('No usage data available since 12 AM today. Try using some apps and check again.');
-      setUsageData([]);
-      setIsLoading(false);
-      return;
-    }
-
-    // Remove duplicate package entries by summing usageTime
-    const usageMap: { [key: string]: UsageStatsItem } = {};
-    stats.forEach(item => {
-      if (!usageMap[item.packageName]) {
-        usageMap[item.packageName] = { ...item };
-      } else {
-        usageMap[item.packageName].usageTime += item.usageTime;
-        // Update lastTimeUsed if current item's lastTimeUsed is later
-        if (item.lastTimeUsed && (!usageMap[item.packageName].lastTimeUsed || item.lastTimeUsed > usageMap[item.packageName].lastTimeUsed!)) {
-          usageMap[item.packageName].lastTimeUsed = item.lastTimeUsed;
+        console.log('⚠️ hasUsageStatsPermission method not available, testing with getUsageStats...');
+        // Try to get usage stats to see if permission is granted
+        try {
+          const testUsage = await UsageModule.getUsageStats();
+          console.log('📊 Test usage stats result:', testUsage ? testUsage.length : 'null');
+          // If we get any result (even empty array), permission is likely granted
+          const hasPermission = testUsage !== null && testUsage !== undefined;
+          console.log('✅ Permission determined:', hasPermission);
+          setHasPermission(hasPermission);
+        } catch (error) {
+          console.log('❌ Error getting test usage stats:', error);
+          setHasPermission(false);
         }
       }
-    });
+    } catch (error) {
+      console.error('❌ Error checking usage permission:', error);
+      setHasPermission(false);
+    } finally {
+      setPermissionChecked(true);
+      console.log('✅ Permission check completed');
+    }
+  };
 
-    const processedStats = Object.values(usageMap);
+  const openUsageSettings = () => {
+    console.log('⚙️ Opening usage settings...');
+    Alert.alert(
+      'Usage Access Required',
+      'This app needs access to usage statistics to show your app usage data.\n\nSteps to enable:\n1. Tap "Open Settings"\n2. Find this app in the list\n3. Toggle "Permit usage access" ON\n4. Return to this app and pull down to refresh',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => console.log('❌ User cancelled opening settings'),
+        },
+        {
+          text: 'Open Settings',
+          onPress: () => {
+            console.log('⚙️ User chose to open settings');
+            try {
+              if (UsageModule && UsageModule.openUsageSettings) {
+                console.log('📱 Calling UsageModule.openUsageSettings()...');
+                UsageModule.openUsageSettings();
+              } else {
+                console.log('⚠️ openUsageSettings not available, using Linking.openSettings()...');
+                // Fallback to general settings
+                Linking.openSettings();
+              }
+            } catch (error) {
+              console.error('❌ Error opening settings:', error);
+              console.log('🔄 Trying fallback Linking.openSettings()...');
+              Linking.openSettings();
+            }
+          },
+        },
+      ]
+    );
+  };
 
-    // Sort by usageTime descending and take top 5
-    const sortedStats = processedStats
-      .sort((a, b) => b.usageTime - a.usageTime)
-      .slice(0, 5);
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
 
-    console.log('Top 5 most used apps today:', sortedStats);
-    setUsageData(sortedStats);
-  } catch (err) {
-    console.error('Error fetching usage stats: ', err);
-    setError(err instanceof Error ? err.message : 'Unknown error occurred');
-    setUsageData([]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  const getAppDisplayName = (packageName: string): string => {
+    const appNames: { [key: string]: string } = {
+      'com.whatsapp': 'WhatsApp',
+      'com.instagram.android': 'Instagram',
+      'com.youtube.android': 'YouTube',
+      'com.facebook.katana': 'Facebook',
+      'com.twitter.android': 'Twitter',
+      'com.snapchat.android': 'Snapchat',
+      'com.tiktok.android': 'TikTok',
+      'com.spotify.music': 'Spotify',
+      'com.netflix.mediaclient': 'Netflix',
+      'com.google.android.youtube': 'YouTube',
+      'com.android.chrome': 'Chrome',
+      'com.microsoft.office.outlook': 'Outlook',
+      'com.slack': 'Slack',
+      'com.discord': 'Discord',
+      'com.telegram.messenger': 'Telegram',
+    };
 
+    return appNames[packageName] || packageName.split('.').pop() || packageName;
+  };
 
-  // Show splash screen
-  if (showSplash) {
-    return (
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: '#007AFF',
-        justifyContent: 'center', 
-        alignItems: 'center',
-        padding: 40
-      }}>
-        <View style={{
-          backgroundColor: 'white',
-          borderRadius: 20,
-          padding: 30,
-          alignItems: 'center',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 8
-        }}>
-          <Text style={{ 
-            fontSize: 28, 
-            fontWeight: 'bold', 
-            color: '#007AFF',
-            marginBottom: 20,
-            textAlign: 'center'
-          }}>
-            Welcome to App Usage Tracker! 📱
-          </Text>
-          
-          <Text style={{ 
-            fontSize: 16, 
-            color: '#666',
-            textAlign: 'center',
-            lineHeight: 24,
-            marginBottom: 25
-          }}>
-            Discover how you spend your time on your device and become more mindful of your digital habits.
-          </Text>
-          
-          <View style={{
-            backgroundColor: '#f0f8ff',
-            padding: 15,
-            borderRadius: 10,
-            borderLeftWidth: 4,
-            borderLeftColor: '#007AFF'
-          }}>
-            <Text style={{ 
-              fontSize: 14, 
-              fontWeight: '600',
-              color: '#007AFF',
-              textAlign: 'center'
-            }}>
-              Loading your personalized experience...
-            </Text>
-          </View>
+  const getAppIcon = (packageName: string): string => {
+    const iconMap: { [key: string]: string } = {
+      'com.whatsapp': 'whatsapp',
+      'com.instagram.android': 'instagram',
+      'com.youtube.android': 'youtube',
+      'com.facebook.katana': 'facebook',
+      'com.twitter.android': 'twitter',
+      'com.snapchat.android': 'snapchat',
+      'com.spotify.music': 'spotify',
+      'com.netflix.mediaclient': 'netflix',
+      'com.android.chrome': 'google-chrome',
+      'com.microsoft.office.outlook': 'microsoft-outlook',
+      'com.slack': 'slack',
+      'com.discord': 'discord',
+      'com.telegram.messenger': 'telegram',
+    };
+
+    return iconMap[packageName] || 'application';
+  };
+
+  const fetchUsageData = async () => {
+    console.log('📊 Fetching usage data, hasPermission:', hasPermission);
+    
+    if (!hasPermission) {
+      console.log('❌ No permission, skipping data fetch');
+      return;
+    }
+
+    try {
+      if (!UsageModule) {
+        console.log('❌ UsageModule not available');
+        Alert.alert('Error', 'Usage tracking is not available on this device');
+        return;
+      }
+
+      // Log the time range we're requesting
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      console.log(`📅 Requesting usage data from ${startOfDay.toLocaleString()} to ${now.toLocaleString()}`);
+      console.log(`🕐 Current timestamp: ${now.getTime()}, Start timestamp: ${startOfDay.getTime()}`);
+
+      console.log('📱 Calling UsageModule.getUsageStats()...');
+      const rawUsage: AppUsage[] = await UsageModule.getUsageStats();
+      console.log('📊 Raw usage data received:', rawUsage ? rawUsage.length : 'null', 'items');
+      console.log(`🕐 Data fetched at: ${new Date().toLocaleTimeString()}`);
+      
+      if (!rawUsage || rawUsage.length === 0) {
+        console.log('📊 No usage data available');
+        setUsageData([]);
+        setTotalTime(0);
+        return;
+      }
+
+      console.log('📱 Raw usage data items (comparing with system):');
+      rawUsage.forEach((app, index) => {
+        const hours = Math.floor(app.totalTimeForeground / 3600);
+        const minutes = Math.floor((app.totalTimeForeground % 3600) / 60);
+        console.log(`  ${index}: ${app.packageName} - ${app.totalTimeForeground}s (${hours}h ${minutes}m)`);
+      });
+
+      // Calculate total time first
+      const total = rawUsage.reduce((sum, app) => sum + app.totalTimeForeground, 0);
+      console.log('⏱️ Total usage time:', total, 'seconds');
+      setTotalTime(total);
+
+      // Since Android now returns aggregated data, we don't need complex deduplication
+      // Just filter, sort and limit the results
+      const sortedApps = rawUsage
+        .filter(app => app.totalTimeForeground > 60) // Filter apps with more than 1 minute
+        .sort((a, b) => b.totalTimeForeground - a.totalTimeForeground)
+        .slice(0, 10) // Get top 10 apps
+        .map((app, index) => ({
+          appName: getAppDisplayName(app.packageName),
+          packageName: app.packageName,
+          timeSpent: app.totalTimeForeground,
+          lastUsed: app.lastTimeUsed,
+          percentage: total > 0 ? (app.totalTimeForeground / total) * 100 : 0,
+          uniqueKey: `${app.packageName}_${index}`, // Add unique key
+        }));
+
+      console.log('📱 Processed apps:', sortedApps.length);
+      console.log('📱 Final processed apps:');
+      sortedApps.forEach((app, index) => {
+        console.log(`  ${index}: ${app.packageName} (${app.appName}) - ${app.timeSpent}s - Key: ${app.uniqueKey}`);
+      });
+      setUsageData(sortedApps);
+    } catch (error) {
+      console.error('❌ Error fetching usage data:', error);
+      // If we get an error, it might be a permission issue
+      console.log('🔍 Error might indicate permission issue, rechecking permission...');
+      setHasPermission(false);
+      Alert.alert(
+        'Permission Required',
+        'Unable to fetch app usage data. This usually means usage access permission is not granted.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: openUsageSettings }
+        ]
+      );
+    }
+  };
+
+  const onRefresh = async () => {
+    console.log('🔄 Refreshing data...');
+    setRefreshing(true);
+    await checkUsagePermission();
+    if (hasPermission) {
+      console.log('✅ Permission granted, fetching data...');
+      await fetchUsageData();
+    } else {
+      console.log('❌ Permission not granted after refresh');
+    }
+    setRefreshing(false);
+    console.log('🔄 Refresh completed');
+  };
+
+  useEffect(() => {
+    console.log('🚀 Component mounted, checking permission...');
+    checkUsagePermission();
+  }, []);
+
+  useEffect(() => {
+    console.log('🔄 Permission state changed:', { permissionChecked, hasPermission });
+    if (permissionChecked && hasPermission) {
+      console.log('✅ Loading data...');
+      const loadData = async () => {
+        setLoading(true);
+        await fetchUsageData();
+        setLoading(false);
+      };
+      loadData();
+    } else if (permissionChecked && !hasPermission) {
+      console.log('❌ No permission, stopping loading...');
+      setLoading(false);
+    }
+  }, [hasPermission, permissionChecked]);
+
+  const renderUsageItem = (item: UsageStats, index: number) => (
+    <View key={item.uniqueKey} style={styles.usageItem}>
+      <View style={styles.appInfo}>
+        <View style={styles.iconContainer}>
+          <MaterialCommunityIcons
+            name={getAppIcon(item.packageName) as any}
+            size={24}
+            color="#6366F1"
+          />
+        </View>
+        <View style={styles.appDetails}>
+          <Text style={styles.appName}>{item.appName}</Text>
+          <Text style={styles.lastUsed}>Last used: {item.lastUsed}</Text>
         </View>
       </View>
+      <View style={styles.usageStats}>
+        <Text style={styles.timeSpent}>{formatTime(item.timeSpent)}</Text>
+        <Text style={styles.percentage}>{item.percentage.toFixed(1)}%</Text>
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.header}>
+          <Text style={styles.headerTitle}>App Usage</Text>
+          <Text style={styles.headerSubtitle}>Today (since 12:00 AM)</Text>
+        </LinearGradient>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+          <Text style={styles.loadingText}>
+            {!permissionChecked ? 'Checking permissions...' : 'Loading usage data...'}
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  // Show welcome screen until initialization is complete
-  if (!isInitialized) {
+  if (!hasPermission) {
     return (
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: '#007AFF',
-        justifyContent: 'center', 
-        alignItems: 'center',
-        padding: 40
-      }}>
-        <View style={{
-          backgroundColor: 'white',
-          borderRadius: 20,
-          padding: 30,
-          alignItems: 'center',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 8
-        }}>
-          <Text style={{ 
-            fontSize: 28, 
-            fontWeight: 'bold', 
-            color: '#007AFF',
-            marginBottom: 20,
-            textAlign: 'center'
-          }}>
-            Welcome to App Usage Tracker! 📱
-          </Text>
-          
-          <Text style={{ 
-            fontSize: 16, 
-            color: '#666',
-            textAlign: 'center',
-            lineHeight: 24,
-            marginBottom: 25
-          }}>
-            Discover how you spend your time on your device and become more mindful of your digital habits.
-          </Text>
-          
-          <View style={{
-            backgroundColor: '#f0f8ff',
-            padding: 15,
-            borderRadius: 10,
-            borderLeftWidth: 4,
-            borderLeftColor: '#007AFF'
-          }}>
-            <Text style={{ 
-              fontSize: 14, 
-              fontWeight: '600',
-              color: '#007AFF',
-              textAlign: 'center'
-            }}>
-              Setting up your personalized experience...
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.header}>
+          <Text style={styles.headerTitle}>App Usage</Text>
+          <Text style={styles.headerSubtitle}>Today (since 12:00 AM)</Text>
+        </LinearGradient>
+
+        <ScrollView
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.permissionContainer}>
+            <MaterialCommunityIcons name="shield-alert" size={80} color="#6366F1" />
+            <Text style={styles.permissionTitle}>Usage Access Required</Text>
+            <Text style={styles.permissionDescription}>
+              To display your app usage statistics, this app needs access to usage data. 
+              This information stays on your device and is used only to show your personal usage patterns.
+            </Text>
+            
+            <View style={styles.instructionsContainer}>
+              <Text style={styles.instructionsTitle}>How to enable:</Text>
+              <Text style={styles.instructionStep}>1. Tap "Grant Permission" below</Text>
+              <Text style={styles.instructionStep}>2. Find this app in the list</Text>
+              <Text style={styles.instructionStep}>3. Toggle "Permit usage access" ON</Text>
+              <Text style={styles.instructionStep}>4. Return to this app</Text>
+            </View>
+
+            <Pressable style={styles.permissionButton} onPress={openUsageSettings}>
+              <MaterialCommunityIcons name="shield-check" size={24} color="#FFFFFF" />
+              <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            </Pressable>
+
+            <Text style={styles.permissionNote}>
+              Pull down to refresh after granting permission
             </Text>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      {!hasPermission ? (
-        <View style={{ padding: 20, alignItems: 'center' }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' }}>
-            Usage Access Permission Required
-          </Text>
-          
-          <Text style={{ fontSize: 14, marginBottom: 20, textAlign: 'center', lineHeight: 20, color: '#666' }}>
-            This app needs permission to access usage statistics to show you how much time you spend on different apps.
-          </Text>
-          
-          <View style={{ backgroundColor: '#f0f8ff', padding: 15, borderRadius: 8, marginBottom: 20, width: '100%' }}>
-            <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 10, color: '#0066cc' }}>
-              How to Grant Permission:
+    <SafeAreaView style={styles.container}>
+      <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.header}>
+        <Text style={styles.headerTitle}>App Usage</Text>
+        <Text style={styles.headerSubtitle}>Today (since 12:00 AM)</Text>
+        {totalTime > 0 && (
+          <Text style={styles.totalTime}>Total: {formatTime(totalTime)}</Text>
+        )}
+      </LinearGradient>
+
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {usageData.length === 0 ? (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="chart-bar" size={64} color="#9CA3AF" />
+            <Text style={styles.emptyTitle}>No Usage Data</Text>
+            <Text style={styles.emptySubtitle}>
+              No app usage data available. This usually means usage access permission is not granted or no apps have been used recently.
             </Text>
-            <Text style={{ fontSize: 12, lineHeight: 18, color: '#333' }}>
-              1. Tap "Open Settings" below{''}
-              2. Find "myApp" in the list{''}
-              3. Toggle the switch to ON{''}
-              4. Return to this app{''}
-              5. The app will automatically detect the permission
-            </Text>
+            <Pressable style={styles.checkPermissionButton} onPress={openUsageSettings}>
+              <MaterialCommunityIcons name="cog" size={20} color="#6366F1" />
+              <Text style={styles.checkPermissionText}>Check Permissions</Text>
+            </Pressable>
           </View>
-          
-          <View style={{ alignItems: 'center', width: '100%' }}>
-            <Button title="Open Settings" onPress={requestPermission} color="#007AFF" />
+        ) : (
+          <View style={styles.usageList}>
+            <Text style={styles.sectionTitle}>Most Used Apps</Text>
+            {usageData.map((item, index) => renderUsageItem(item, index))}
           </View>
-          
-          <View style={{ marginTop: 15, padding: 15, backgroundColor: '#fff3cd', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#ffc107' }}>
-            <Text style={{ fontSize: 12, color: '#856404', fontWeight: 'bold', marginBottom: 5 }}>
-              Troubleshooting Tips:
-            </Text>
-            <Text style={{ fontSize: 11, color: '#856404', lineHeight: 16 }}>
-              • Make sure you've used some apps recently{''}
-              • Try using apps for a few minutes then check again{''}
-              • Some devices may have additional restrictions{''}
-              • Check if battery optimization is disabled for this app
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View style={{ flex: 1 }}>
-          <View style={{ marginBottom: 10 }}>
-            <Button title="Get Usage Data" onPress={getUsageStats} />
-          </View>
-          
-          {isLoading && (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text>Loading usage data...</Text>
-            </View>
-          )}
-          
-          {error && (
-            <View style={{ padding: 20, backgroundColor: '#ffebee', marginVertical: 10, borderRadius: 5 }}>
-              <Text style={{ color: '#c62828' }}>Error: {error}</Text>
-            </View>
-          )}
-          
-          {!isLoading && !error && (
-            <View style={{ marginTop: 10 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center', color: '#007AFF' }}>
-                Top 5 Most Used Apps
-              </Text>
-              
-              <Text style={{ fontSize: 14, marginBottom: 10, textAlign: 'center', color: '#666' }}>
-                Showing your most frequently used apps since 12 AM today
-              </Text>
-              
-              <Text style={{ fontSize: 14, marginBottom: 10, textAlign: 'center' }}>
-                Apps found: {usageData.length}
-              </Text>
-              
-              {usageData.length > 0 ? (
-                <FlatList
-                  data={usageData}
-                  keyExtractor={(item, index) => index.toString()}
-                  renderItem={({ item, index }) => (
-                    <View style={{ 
-                      marginVertical: 8, 
-                      padding: 15, 
-                      backgroundColor: index === 0 ? '#fff3cd' : '#f5f5f5', 
-                      borderRadius: 8,
-                      borderLeftWidth: 4,
-                      borderLeftColor: index === 0 ? '#ffc107' : index === 1 ? '#6c757d' : index === 2 ? '#cd7f32' : '#28a745'
-                    }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <View style={{ 
-                          width: 24, 
-                          height: 24, 
-                          borderRadius: 12, 
-                          backgroundColor: index === 0 ? '#ffc107' : index === 1 ? '#6c757d' : index === 2 ? '#cd7f32' : '#28a745',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: 10
-                        }}>
-                          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>
-                            {index + 1}
-                          </Text>
-                        </View>
-                        <Text style={{ fontWeight: 'bold', fontSize: 16, flex: 1 }}>
-                          {item.packageName.split('.').pop() || item.packageName}
-                        </Text>
-                      </View>
-                      
-                      <Text style={{ color: '#666', fontSize: 12, marginBottom: 8 }}>
-                        {item.packageName}
-                      </Text>
-                      
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: '#007AFF', fontWeight: '600', fontSize: 14 }}>
-                          {formatTime(item.usageTime)}
-                        </Text>
-                        <Text style={{ color: '#666', fontSize: 12 }}>
-                          {index === 0 ? '🥇 Most Used' : index === 1 ? '🥈 Second' : index === 3 ? '🥉 Third' : 'Used'}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                />
-              ) : (
-                <Text style={{ textAlign: 'center', color: '#666' }}>
-                  No usage data available. Press "Get Usage Data" to fetch data.
-                </Text>
-              )}
-            </View>
-          )}
-        </View>
-      )}
-    </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  header: {
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  totalTime: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 8,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 40,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  usageList: {
+    paddingBottom: 20,
+  },
+  usageItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  appInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  appDetails: {
+    flex: 1,
+  },
+  appName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  lastUsed: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  usageStats: {
+    alignItems: 'flex-end',
+  },
+  timeSpent: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  percentage: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 40,
+  },
+  permissionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginTop: 20,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  permissionDescription: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 30,
+  },
+  instructionsContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    width: '100%',
+  },
+  instructionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  instructionStep: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+    paddingLeft: 10,
+  },
+  permissionButton: {
+    backgroundColor: '#6366F1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 20,
+    width: '100%',
+  },
+  permissionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  permissionNote: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  checkPermissionButton: {
+    backgroundColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  checkPermissionText: {
+    color: '#6366F1',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+});
