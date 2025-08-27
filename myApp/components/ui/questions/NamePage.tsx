@@ -2,24 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useUserStore } from '../../../store/userStore';
+import { useAnswerStore } from './AnswerManager';
 import { QuestionHeader } from './QuestionHeader';
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyA4u9wYxej-LbKAl7NIbEJTlrt5Y5a5Xvc",
-  authDomain: "mindmate-52779.firebaseapp.com",
-  projectId: "mindmate-52779",
-  storageBucket: "mindmate-52779.firebasestorage.app",
-  messagingSenderId: "772843818203",
-  appId: "1:772843818203:android:95a264b8688342602bd0fe"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 type SignupMethod = 'email' | 'oauth' | 'none';
 
@@ -36,6 +21,7 @@ export default function NicknameInputScreen({ signupMethod = 'none', onComplete 
   const { user, setUser } = useUserStore();
   const setNeedsNickname = useUserStore((s) => s.setNeedsNickname);
   const setOnboardingStage = useUserStore((s) => s.setOnboardingStage);
+  const setUserName = useAnswerStore((s) => s.setUserName);
 
   const isPrimaryDisabled = useMemo(() => {
     const hasNickname = userNickname.trim().length > 0;
@@ -51,42 +37,30 @@ export default function NicknameInputScreen({ signupMethod = 'none', onComplete 
     setIsLoading(true);
     
     try {
-      // Prepare user data for Firestore
-      const userData = {
-        nickname: userNickname.trim(),
-        email: signupMethod === 'email' ? userEmail.trim() : user?.email || null,
-        userType: 'user', // Since this is from user signup
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        isActive: true,
-      };
-
-      // Save to Firestore Users collection
-      const docRef = await addDoc(collection(db, 'Users'), userData);
-      console.log('User document written with ID: ', docRef.id);
+      // Save the user's name to the AnswerManager
+      setUserName(userNickname.trim());
 
       // Update the user store with the new information
       if (user) {
         setUser({
           ...user,
           name: userNickname.trim(),
-          email: userData.email,
+          email: signupMethod === 'email' ? userEmail.trim() : user?.email || null,
         });
       }
 
       // Call the completion callback
       onComplete?.({ 
         nickname: userNickname.trim(), 
-        email: userData.email || undefined 
+        email: (signupMethod === 'email' ? userEmail.trim() : user?.email) || undefined 
       });
 
-      Alert.alert('Success', 'Your information has been saved successfully!');
       // Advance to Question One
       setNeedsNickname(false);
       setOnboardingStage('questionOne');
       
     } catch (error) {
-      console.error('Error adding user document: ', error);
+      console.error('Error processing nickname: ', error);
       Alert.alert(
         'Error', 
         'Failed to save your information. Please try again.',

@@ -35,7 +35,7 @@ export function SplashScreen() {
                 <AntDesign name="hearto" size={40} color="white" />
               </LinearGradient>
               
-              <Text style={styles.title}>Welcome to MindMate</Text>
+              <Text style={styles.title}>Welcome to Witty Mate</Text>
               <Text style={styles.subtitle}>
                 Your confidential mental wellness companion
               </Text>

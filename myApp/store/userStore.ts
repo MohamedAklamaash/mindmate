@@ -21,6 +21,7 @@ type User = {
   email: string | null;
   name: string | null;
   photoURL: string | null;
+  firestoreId?: string; // Add Firestore document ID
 };
 
 // Define the store type
@@ -36,6 +37,7 @@ type UserStore = {
   setAuthenticated: (isAuthenticated: boolean) => void;
   setNeedsNickname: (needs: boolean) => void;
   setOnboardingStage: (stage: 'none' | 'nickname' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
+  setUserFirestoreId: (firestoreId: string) => void; // Add method to set Firestore ID
   signOut: () => void;
 };
 
@@ -54,6 +56,9 @@ export const useUserStore = create<UserStore>()(
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
       setNeedsNickname: (needs) => set({ needsNickname: needs }),
       setOnboardingStage: (stage) => set({ onboardingStage: stage }),
+      setUserFirestoreId: (firestoreId) => set((state) => ({ 
+        user: state.user ? { ...state.user, firestoreId } : null 
+      })),
       signOut: () => set({ user: null, isAuthenticated: false }),
     }),
     {

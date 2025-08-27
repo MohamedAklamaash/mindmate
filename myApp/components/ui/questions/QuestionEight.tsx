@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUserStore } from '../../../store/userStore';
+import { useAnswerStore } from './AnswerManager';
 import { QuestionHeader } from './QuestionHeader';
 import { StatusBar } from 'expo-status-bar';
 type Goal = { id: string; label: string };
@@ -20,6 +21,16 @@ export default function QuestionEight() {
   const [selected, setSelected] = useState<string[]>([]);
   const disabled = useMemo(() => selected.length === 0, [selected]);
   const setOnboardingStage = useUserStore((s) => s.setOnboardingStage);
+  const setQuestionEightAnswer = useAnswerStore((s) => s.setQuestionEightAnswer);
+  
+  const handleContinue = () => {
+    if (selected.length > 0) {
+      // Save the answer to the store
+      setQuestionEightAnswer(selected);
+      // Navigate to next question
+      setOnboardingStage('questionNine');
+    }
+  };
 
   useEffect(() => {
 <StatusBar hidden={true} />
@@ -62,7 +73,7 @@ export default function QuestionEight() {
               })}
             </View>
 
-            <Pressable disabled={disabled} style={styles.buttonWrapper} onPress={() => setOnboardingStage('questionNine')}>
+            <Pressable disabled={disabled} style={styles.buttonWrapper} onPress={handleContinue}>
               {({ pressed }) => (
                 <LinearGradient colors={['#34D399', '#60A5FA']} style={[styles.primaryButton, (pressed || disabled) && styles.primaryButtonPressed]}>
                   <Text style={styles.primaryButtonText}>Continue</Text>

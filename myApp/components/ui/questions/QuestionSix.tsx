@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUserStore } from '../../../store/userStore';
+import { useAnswerStore } from './AnswerManager';
 import { QuestionHeader } from './QuestionHeader';
 import { StatusBar } from 'expo-status-bar';
 
@@ -16,6 +17,16 @@ export default function QuestionSix() {
   const [value, setValue] = useState<string | null>(null);
   const disabled = useMemo(() => !value, [value]);
   const setOnboardingStage = useUserStore((s) => s.setOnboardingStage);
+  const setQuestionSixAnswer = useAnswerStore((s) => s.setQuestionSixAnswer);
+  
+  const handleContinue = () => {
+    if (value) {
+      // Save the answer to the store
+      setQuestionSixAnswer(value);
+      // Navigate to next question
+      setOnboardingStage('questionSeven');
+    }
+  };
 
   useEffect(() => {
     <StatusBar hidden={true} />
@@ -54,7 +65,7 @@ export default function QuestionSix() {
               })}
             </View>
 
-            <Pressable disabled={disabled} style={styles.buttonWrapper} onPress={() => setOnboardingStage('questionSeven')}>
+            <Pressable disabled={disabled} style={styles.buttonWrapper} onPress={handleContinue}>
               {({ pressed }) => (
                 <LinearGradient colors={['#60A5FA', '#14B8A6']} style={[styles.primaryButton, (pressed || disabled) && styles.primaryButtonPressed]}>
                   <Text style={styles.primaryButtonText}>Continue</Text>

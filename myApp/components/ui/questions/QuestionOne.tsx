@@ -3,6 +3,7 @@ import {  View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUserStore } from '../../../store/userStore';
+import { useAnswerStore } from './AnswerManager';
 import { QuestionHeader } from './QuestionHeader';
 import { StatusBar } from 'expo-status-bar';
 type StressItem = { id: string; label: string; icon: string };
@@ -23,11 +24,21 @@ export function QuestionOne() {
   const [selected, setSelected] = useState<string[]>([]);
   const [other, setOther] = useState('');
   const setOnboardingStage = useUserStore((s) => s.setOnboardingStage);
+  const setQuestionOneAnswer = useAnswerStore((s) => s.setQuestionOneAnswer);
+  
   const toggle = (id: string) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const disabled = useMemo(() => selected.length === 0 && other.trim().length === 0, [selected, other]);
+  
+  const handleContinue = () => {
+    // Save the answer to the store
+    setQuestionOneAnswer(selected, other.trim());
+    // Navigate to next question
+    setOnboardingStage('questionTwo');
+  };
+  
  useEffect(() => {
     // Hide the status bar on mount
 <StatusBar hidden={true} />
@@ -78,7 +89,7 @@ export function QuestionOne() {
               </View>
             </View>
 
-            <Pressable disabled={disabled} style={styles.buttonWrapper} onPress={() => setOnboardingStage('questionTwo')}>
+            <Pressable disabled={disabled} style={styles.buttonWrapper} onPress={handleContinue}>
               {({ pressed }) => (
                 <LinearGradient
                   colors={['#60A5FA', '#A78BFA']}

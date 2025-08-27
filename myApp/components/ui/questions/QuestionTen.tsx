@@ -1,21 +1,78 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUserStore } from '../../../store/userStore';
+import { useAnswerStore } from './AnswerManager';
+import { saveUserWithAnswers, updateUserAnswers } from '../../../services/firebaseService';
 import { QuestionHeader } from './QuestionHeader';
 import { StatusBar } from 'expo-status-bar';
 export default function QuestionTen() {
+  const [isLoading, setIsLoading] = useState(false);
   const setAuthenticated = useUserStore((s) => s.setAuthenticated);
   const setOnboardingStage = useUserStore((s) => s.setOnboardingStage);
+  const setUserFirestoreId = useUserStore((s) => s.setUserFirestoreId);
+  const user = useUserStore((s) => s.user);
+  const getAllAnswers = useAnswerStore((s) => s.getAllAnswers);
+  const clearAnswers = useAnswerStore((s) => s.clearAnswers);
 
   useEffect(() => {
 <StatusBar hidden={true} />
   }, []);
 
-  const handleOnboardingComplete = () => {
-    setOnboardingStage('none');
-    setAuthenticated(true);
+  const handleOnboardingComplete = async () => {
+    if (!user) {
+      Alert.alert('Error', 'User data not found. Please try again.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Get all answers from the store
+      const answers = getAllAnswers();
+      
+      // Prepare user data for Firestore using the name from answers
+      const userData = {
+        nickname: answers.userName || user.name || 'User',
+        email: user.email,
+        userType: 'user' as const,
+        isActive: true,
+      };
+
+      let firestoreId: string;
+      
+      // Check if user already has a Firestore ID (update) or create new
+      if (user.firestoreId) {
+        await updateUserAnswers(user.firestoreId, answers);
+        firestoreId = user.firestoreId;
+      } else {
+        // Save new user with answers to Firestore
+        firestoreId = await saveUserWithAnswers(userData, answers);
+        // Update the user store with the Firestore ID
+        setUserFirestoreId(firestoreId);
+      }
+
+      console.log('User data and answers saved successfully:', firestoreId);
+      
+      // Clear the answers from the store
+      clearAnswers();
+      
+      // Complete onboarding
+      setOnboardingStage('none');
+      setAuthenticated(true);
+    } catch (error) {
+      console.error('Error saving user data:', error);
+      Alert.alert(
+        'Error', 
+        'Failed to save your data. Please check your internet connection and try again.',
+        [
+          { text: 'Retry', onPress: handleOnboardingComplete },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,7 +87,7 @@ export default function QuestionTen() {
                 <MaterialCommunityIcons name="check-circle-outline" size={40} color="white" />
               </LinearGradient>
               <Text style={styles.title}>Thanks for sharing!</Text>
-              <Text style={styles.subtitle}>We'll use this to personalize your MindMate experience and provide you with the best possible support.</Text>
+              <Text style={styles.subtitle}>We'll use this to personalize your Witty Mate experience and provide you with the best possible support.</Text>
             </View>
 
             <View style={styles.card}>
@@ -44,10 +101,16 @@ export default function QuestionTen() {
               </View>
             </View>
 
-            <Pressable style={styles.buttonWrapper} onPress={handleOnboardingComplete}>
+            <Pressable 
+              style={[styles.buttonWrapper, isLoading && styles.buttonDisabled]} 
+              onPress={handleOnboardingComplete}
+              disabled={isLoading}
+            >
               {({ pressed }) => (
-                <LinearGradient colors={['#34D399', '#60A5FA']} style={[styles.primaryButton, pressed && styles.primaryButtonPressed]}>
-                  <Text style={styles.primaryButtonText}>Continue to MindMate</Text>
+                <LinearGradient colors={['#34D399', '#60A5FA']} style={[styles.primaryButton, (pressed || isLoading) && styles.primaryButtonPressed]}>
+                  <Text style={styles.primaryButtonText}>
+                    {isLoading ? 'Saving...' : 'Continue to Witty Mate'}
+                  </Text>
                 </LinearGradient>
               )}
             </Pressable>
@@ -72,6 +135,7 @@ const styles = StyleSheet.create({
   list: { gap: 6 },
   listItem: { color: '#374151', fontSize: 12 },
   buttonWrapper: { width: '100%', marginTop: 16 },
+  buttonDisabled: { opacity: 0.6 },
   primaryButton: { borderRadius: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   primaryButtonPressed: { opacity: 0.85 },
   primaryButtonText: { color: 'white', fontWeight: '600', fontSize: 14 },

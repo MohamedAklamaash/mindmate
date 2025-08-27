@@ -90,7 +90,7 @@ export function GoogleSignIn() {
               // Create a demo user
               setUser({
                 id: String(Date.now()),
-                email: 'demo@mindmate.com',
+                email: 'demo@wittymate.com',
                 name: 'Demo User',
                 photoURL: null,
               });
@@ -180,7 +180,7 @@ export function GoogleSignIn() {
                 <AntDesign name="hearto" size={40} color="white" />
               </LinearGradient>
               
-              <Text style={styles.title}>Welcome to MindMate</Text>
+              <Text style={styles.title}>Welcome to Witty Mate</Text>
               <Text style={styles.subtitle}>
                 Let's get you started on your wellness journey
               </Text>
