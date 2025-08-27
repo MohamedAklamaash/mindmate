@@ -32,7 +32,7 @@ export default function QuestionThree() {
 <StatusBar hidden={true} />
   }, []);
   return (
-    <LinearGradient colors={['#A1E8A1', '#FFFCFC']} style={styles.container}>
+    <LinearGradient colors={['#f3e7d2ff','#dfc088ff', '#f7eed0ff']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar hidden={true} />
         <QuestionHeader />

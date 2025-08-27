@@ -31,12 +31,12 @@ type UserStore = {
   isAuthenticated: boolean;
   hydrated: boolean;
   needsNickname: boolean;
-  onboardingStage: 'none' | 'nickname' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen';
+  onboardingStage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen';
   setUserType: (type: 'user' | 'therapist') => void;
   setUser: (user: User | null) => void;
   setAuthenticated: (isAuthenticated: boolean) => void;
   setNeedsNickname: (needs: boolean) => void;
-  setOnboardingStage: (stage: 'none' | 'nickname' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
+  setOnboardingStage: (stage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
   setUserFirestoreId: (firestoreId: string) => void; // Add method to set Firestore ID
   signOut: () => void;
 };

@@ -32,7 +32,7 @@ export default function QuestionSeven() {
   }, []);
 
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']}  style={styles.container}>
+    <LinearGradient colors={['#d0c7ebff','#c2b0faff', '#c9dff9ff']}  style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar hidden={true} />
         <QuestionHeader />

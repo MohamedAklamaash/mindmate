@@ -39,13 +39,17 @@ export function QuestionHeader({
         'questionEight': 'questionSeven',
         'questionNine': 'questionEight',
         'questionTen': 'questionNine',
-        'namePage': 'questionTen',
       };
 
       // Try to navigate to the previous question
       const previousStage = navigationFlow[currentStage];
       
-      if (previousStage) {
+      if (currentStage === 'namePage') {
+        // Special case: NamePage back button should go to GoogleSignIn
+        // Reset authentication state to show GoogleSignIn component
+        setOnboardingStage('none');
+        signOut(); // This will reset authentication state and show GoogleSignIn
+      } else if (previousStage) {
         setOnboardingStage(previousStage as any);
       } else {
         // If no previous stage, try router.back() first
@@ -115,8 +119,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingHorizontal: 30,
+    paddingTop: 50,
     paddingBottom: 5,
     width: '100%',
   },

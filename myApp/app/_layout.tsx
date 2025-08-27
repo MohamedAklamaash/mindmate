@@ -45,7 +45,7 @@ export default function RootLayout() {
   }
 
   // If user type is 'user' but not authenticated and needs nickname, go to NamePage
-  if (userType === 'user' && !isAuthenticated && needsNickname) {
+  if (userType === 'user' && !isAuthenticated && (needsNickname || onboardingStage === 'namePage')) {
     return <NicknameInputScreen signupMethod="none" />;
   }
 

@@ -33,7 +33,7 @@ export default function QuestionSix() {
   }, []);
 
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient colors={['#cde2fcff','#a2c5f0ff', '#d3f4f0ff']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
       <StatusBar hidden={true} />
         <QuestionHeader />

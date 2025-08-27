@@ -39,10 +39,10 @@ export function QuestionOne() {
     setOnboardingStage('questionTwo');
   };
   
- useEffect(() => {
-    // Hide the status bar on mount
-<StatusBar hidden={true} />
-  }, []);
+  useEffect(() => {
+    // Ensure we're in the correct onboarding stage
+    setOnboardingStage('questionOne');
+  }, [setOnboardingStage]);
   return (
     <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>

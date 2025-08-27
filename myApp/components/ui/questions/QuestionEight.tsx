@@ -41,7 +41,7 @@ export default function QuestionEight() {
   };
 
   return (
-    <LinearGradient  colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient  colors={['#daf5ebff','#c3f4e2ff', '#d3e7feff']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar hidden={true} />
         <QuestionHeader />

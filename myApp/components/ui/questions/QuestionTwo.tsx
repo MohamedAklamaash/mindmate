@@ -32,7 +32,7 @@ export default function QuestionTwo() {
 <StatusBar hidden={true} />
   }, []);
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient colors={['#EBF4FF', '#d7bcf4ff', '#FDF2F8']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar hidden={true} />
         <QuestionHeader />

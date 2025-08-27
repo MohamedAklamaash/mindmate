@@ -33,7 +33,7 @@ export default function QuestionFive() {
 }, []);
 
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient colors={['#f9ceceff','#f4b3b3ff', '#f9e0cbff']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
       <StatusBar hidden={true} />
         <QuestionHeader />

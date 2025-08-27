@@ -33,7 +33,7 @@ export default function QuestionFour() {
     <StatusBar hidden={true} />
   }, []);
   return (
-    <LinearGradient colors={['#A1E8A1', '#FFFCFC']} style={styles.container}>
+    <LinearGradient colors={['#d7f0d7ff','#A1E8A1', '#FFFCFC']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
       <StatusBar hidden={true} />
         <QuestionHeader />

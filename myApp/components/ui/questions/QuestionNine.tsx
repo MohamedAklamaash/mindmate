@@ -34,7 +34,7 @@ export default function QuestionNine() {
   }, []);
 
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']}  style={styles.container}>
+    <LinearGradient colors={['#fcdeedff','#fbc3e1ff', '#d8cdf9ff']}  style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar hidden={true} />
         <QuestionHeader />

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +22,11 @@ export default function NicknameInputScreen({ signupMethod = 'none', onComplete 
   const setNeedsNickname = useUserStore((s) => s.setNeedsNickname);
   const setOnboardingStage = useUserStore((s) => s.setOnboardingStage);
   const setUserName = useAnswerStore((s) => s.setUserName);
+
+  // Set onboarding stage to 'namePage' when component mounts
+  useEffect(() => {
+    setOnboardingStage('namePage');
+  }, [setOnboardingStage]);
 
   const isPrimaryDisabled = useMemo(() => {
     const hasNickname = userNickname.trim().length > 0;

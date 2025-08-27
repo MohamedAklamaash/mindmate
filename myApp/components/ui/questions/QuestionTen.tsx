@@ -76,7 +76,7 @@ export default function QuestionTen() {
   };
 
   return (
-    <LinearGradient  colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']}style={styles.container}>
+    <LinearGradient  colors={['#e0faf1ff','#c6fae6ff', '#dbe7f7ff']}style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar hidden={true} />
         <QuestionHeader />
