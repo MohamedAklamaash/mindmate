@@ -1,15 +1,18 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useUserStore } from '@/store/userStore';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const userType = useUserStore((state) => state.userType);
 
   return (
     <Tabs
@@ -37,7 +40,16 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color, size }) => (<Ionicons name="stats-chart" size={size} color={color} />), 
+           href: userType === 'user' ? '/explore' : null,
+        }}
+      />
+      <Tabs.Screen
+        name="therapist"
+        options={{
+          title: 'Therapist',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.2.fill" color={color} />,
+          href: userType === 'user' ? '/therapist' : null,
         }}
       />
       <Tabs.Screen
@@ -45,6 +57,23 @@ export default function TabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          href: userType === 'user' ? '/chat' : null,
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          title: 'Clients',
+          tabBarIcon: ({ color, size }) => (<Ionicons name="people" size={size} color={color} />),  
+          href: userType === 'therapist' ? '/clients' : null,
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: 'Schedule',
+           tabBarIcon: ({ color, size }) => (<Ionicons name="calendar" size={size} color={color} />),
+           href: userType === 'therapist' ? '/schedule' : null,
         }}
       />
     </Tabs>

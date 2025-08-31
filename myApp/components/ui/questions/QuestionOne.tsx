@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   buttonWrapper: { width: '100%', marginTop: 10 },
   primaryButton: { borderRadius: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', opacity: 1 },
   primaryButtonPressed: { opacity: 0.6 },
-  primaryButtonText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  primaryButtonText: { color: 'white', fontWeight: '600', fontSize: 14,marginBottom: 10 },
 });
 
 

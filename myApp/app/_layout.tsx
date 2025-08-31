@@ -19,6 +19,7 @@ import QuestionSeven from '@/components/ui/questions/QuestionSeven';
 import QuestionEight from '@/components/ui/questions/QuestionEight';
 import QuestionNine from '@/components/ui/questions/QuestionNine';
 import QuestionTen from '@/components/ui/questions/QuestionTen';
+import TherapistQuestionScreen from '@/components/ui/questions/TherapistQuestion';
 import { useUserStore } from '@/store/userStore';
 
 export default function RootLayout() {
@@ -42,6 +43,11 @@ export default function RootLayout() {
   // Show splash screen if user type is not selected
   if (userType === null) {
     return <SplashScreen />;
+  }
+
+  // If user type is 'therapist', show the therapist question screen
+  if (userType === 'therapist' && !isAuthenticated) {
+    return <TherapistQuestionScreen />;
   }
 
   // If user type is 'user' but not authenticated and needs nickname, go to NamePage
