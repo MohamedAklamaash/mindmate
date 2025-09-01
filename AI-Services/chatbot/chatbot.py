@@ -3,7 +3,7 @@ from datetime import datetime, date
 import logging
 from chat import ChatCompletionBase
 from prompt_manager import PromptManager
-from structures import Analysis, Summarise
+from structures import Analysis, Summarise, ConversationInsights
 
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -108,6 +108,9 @@ class ChatBot:
         """Clear previous context at local midnight only."""
         now = datetime.now()
         if now.date() != self._last_context_reset_date:
+            print("trying to find the overall insights of the conversation")
+            summary_text = self.summarize(request_format={"type": "list", "schema": ConversationInsights})
+            print("summary_text", summary_text)
             self._previous_context.clear()
             self._last_context_reset_date = now.date()
             try:

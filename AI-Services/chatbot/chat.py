@@ -27,10 +27,44 @@ class ChatCompletionBase(ABC):
         Args:
             config_path (str): Path to the configuration YAML file
         """
+        self._config_path = config_path  # Store config path for later use
         self.config = self._load_config(config_path)
         self.model_name = self.config.get('model_name')
         self.api_key = self.config.get('api_key')
         self.client = self._initialize_client()
+        
+        # Automatically update config with context window info on initialization
+        try:
+            self._update_config_with_context_window_silent()
+        except Exception as e:
+            logger.warning(f"Failed to update config with context window during initialization: {e}")
+    
+    def _update_config_with_context_window_silent(self) -> None:
+        """
+        Silently update the config file with context window info without raising exceptions.
+        Used during initialization to avoid breaking object creation.
+        """
+        try:
+            # Check if context window info already exists in config
+            if 'model_context_window' in self.config:
+                logger.info("Context window info already exists in config, skipping update")
+                return
+            
+            # Get context window info
+            context_info = self.get_model_context_window()
+            
+            # Update config with context window info
+            self.config['model_context_window'] = context_info
+            
+            # Write updated config back to file
+            with open(self._config_path, 'w') as file:
+                yaml.dump(self.config, file, default_flow_style=False, indent=2)
+            
+            logger.info(f"Updated config file with context window info: {context_info['context_window']}")
+            
+        except Exception as e:
+            logger.warning(f"Silent config update failed: {e}")
+            # Don't raise exception to avoid breaking initialization
         
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """
@@ -255,6 +289,98 @@ class ChatCompletionBase(ABC):
             "model": self.model_name,
             "client_type": "Google GenAI"
         }
+    
+    def get_model_context_window(self) -> Dict[str, Any]:
+        """
+        Get the context window and token limits for the current model.
+        
+        Returns:
+            Dict[str, Any]: Model context window information including max input tokens
+        """
+        # Google Gemini model context windows (as of 2024)
+        model_contexts = {
+            "gemini-1.5-flash": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-1.5-pro": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-2.0-flash": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-2.0-flash-exp": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-2.0-pro": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-2.5-flash": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-2.5-pro": {
+                "max_input_tokens": 1048576,  # 1M tokens
+                "max_output_tokens": 8192,
+                "context_window": "1M tokens"
+            },
+            "gemini-1.0-pro": {
+                "max_input_tokens": 32768,  # 32K tokens
+                "max_output_tokens": 8192,
+                "context_window": "32K tokens"
+            },
+            "gemini-1.0-pro-vision": {
+                "max_input_tokens": 32768,  # 32K tokens
+                "max_output_tokens": 8192,
+                "context_window": "32K tokens"
+            }
+        }
+        
+        # Get context info for current model
+        model_context = model_contexts.get(self.model_name, {
+            "max_input_tokens": 1048576,  # Default to 1M for unknown models
+            "max_output_tokens": 8192,
+            "context_window": "1M tokens (default)",
+            "note": "Model not in known list, using default values"
+        })
+        
+        return {
+            "model_name": self.model_name,
+            "context_window": model_context["context_window"],
+            "max_input_tokens": model_context["max_input_tokens"],
+            "max_output_tokens": model_context["max_output_tokens"],
+            "note": model_context.get("note", "Known model")
+        }
+    
+    def get_safe_input_tokens(self,) -> int:
+        """
+        Get a safe number of input tokens to use, leaving buffer for output.
+        
+        Args:
+            buffer_percentage (float): Percentage of max input tokens to reserve as buffer (default 10%)
+            
+        Returns:
+            int: Safe number of input tokens to use
+        """
+        buffer_percentage = self.config.get('buffer_percentage', 0.1)
+        context_info = self.get_model_context_window()
+        max_input_tokens = context_info['max_input_tokens']
+        
+        # Reserve buffer for output tokens and safety margin
+        buffer_tokens = int(max_input_tokens * buffer_percentage)
+        safe_input_tokens = max_input_tokens - buffer_tokens
+        
+        return safe_input_tokens
 
 # Example Pydantic model for structured output
 class Recipe(BaseModel):
@@ -309,6 +435,15 @@ if __name__ == "__main__":
             }
         )
         print("Structured Response:", structured_response)
+        
+        # Get and display model context window info
+        context_info = chat.get_model_context_window()
+        print("Model Context Info:", context_info)
+        
+        # Get safe input tokens
+        safe_tokens = chat.get_safe_input_tokens()
+        print(f"Safe input tokens (with 10% buffer): {safe_tokens}")
+        
         print(chat.get_model_info())
     except Exception as e:
         print(f"Error: {e}")

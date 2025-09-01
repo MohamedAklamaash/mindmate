@@ -9,6 +9,7 @@ top_k: 40
 candidate_count: 1
 presence_penalty: 0.0
 frequency_penalty: 0.0
+buffer_percentage: 0.1
 
 # ChatBot behavior
 summary_threshold: 11
