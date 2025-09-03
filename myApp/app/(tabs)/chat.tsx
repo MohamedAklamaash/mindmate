@@ -1,6 +1,6 @@
 // ChatScreen.tsx
-import React, { useState, useRef } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -13,6 +13,53 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const router = useRouter();
+
+  // Audio visualization animations
+  const animatedValues = useRef(
+    Array.from({ length: 10 }, () => new Animated.Value(0.1))
+  ).current;
+
+  // Start audio visualization animation
+  const startAudioAnimation = () => {
+    const animateBar = (animatedValue: Animated.Value) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValue, {
+            toValue: Math.random() * 0.8 + 0.2,
+            duration: 200 + Math.random() * 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(animatedValue, {
+            toValue: 0.1 + Math.random() * 0.3,
+            duration: 200 + Math.random() * 300,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    };
+
+    animatedValues.forEach(animateBar);
+  };
+
+  // Stop audio visualization animation
+  const stopAudioAnimation = () => {
+    animatedValues.forEach((animatedValue) => {
+      animatedValue.stopAnimation();
+      Animated.timing(animatedValue, {
+        toValue: 0.1,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    });
+  };
+
+  useEffect(() => {
+    if (isRecording) {
+      startAudioAnimation();
+    } else {
+      stopAudioAnimation();
+    }
+  }, [isRecording]);
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -81,7 +128,7 @@ export default function ChatScreen() {
     }
   };
 
-  // Stop Recording and Convert to Base64
+  // Stop Recording and save as MP3
   const stopRecording = async () => {
     console.log("Stopping recording...");
     if (!recordingRef.current) return;
@@ -93,30 +140,27 @@ export default function ChatScreen() {
       if (uri) {
         console.log("Recording stopped. File stored at:", uri);
         
-        // Convert to base64
-        const base64 = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
+        // Create a new filename with MP3 extension
+        const documentsDir = FileSystem.documentDirectory;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const mp3FileName = `recorded_audio_${timestamp}.mp3`;
+        const mp3FilePath = `${documentsDir}${mp3FileName}`;
+        
+        // Copy/Move the recorded file to our desired location with MP3 extension
+        await FileSystem.copyAsync({
+          from: uri,
+          to: mp3FilePath,
         });
         
-        console.log("Audio converted to base64 successfully");
-        console.log("Base64 length:", base64.length);
-        
-        // Save the base64 to a file for testing
-        const documentsDir = FileSystem.documentDirectory;
-        const base64FilePath = `${documentsDir}recorded_audio_base64.txt`;
-        
-        await FileSystem.writeAsStringAsync(base64FilePath, base64);
-        
-        console.log("File saved to:", base64FilePath);
+        console.log("MP3 file saved to:", mp3FilePath);
         
         // Add a message to chat indicating voice recording was saved
         setMessages(prev => [...prev, { 
           role: "system", 
-          text: "🎤 Voice recording saved! (Base64 conversion complete)" 
+          text: `🎤 Voice recording saved as ${mp3FileName}` 
         }]);
         
-        // TODO: Send to Python server via WebSocket
-        // For now, we're just storing the file
+        // TODO: Send MP3 file to Python server
         
       } else {
         throw new Error("Recording URI is null");
@@ -159,6 +203,44 @@ export default function ChatScreen() {
         )}
         contentContainerStyle={styles.messagesContainer}
       />
+
+      {/* Audio Visualization Overlay */}
+      {isRecording && (
+        <View style={styles.audioOverlay}>
+          <View style={styles.audioVisualizerContainer}>
+            <Text style={styles.recordingText}>🎤 Recording...</Text>
+            <View style={styles.audioVisualizer}>
+              {animatedValues.map((animatedValue, index) => (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.audioBar,
+                    {
+                      height: animatedValue.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [10, 80],
+                      }),
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+            <Text style={styles.recordingSubText}>Tap stop button to finish</Text>
+            
+            {/* Mic Button in Overlay */}
+            <TouchableOpacity 
+              style={styles.overlayMicButton} 
+              onPress={handleMicPress}
+            >
+              <Ionicons 
+                name="stop" 
+                size={32} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -241,4 +323,71 @@ const styles = StyleSheet.create({
     backgroundColor: "#ccc",
   },
   sendText: { color: "#fff", fontWeight: "bold" },
+  
+  // Audio visualization overlay styles
+  audioOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  audioVisualizerContainer: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 30,
+    borderRadius: 20,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  recordingText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#ff4444",
+    marginBottom: 20,
+  },
+  audioVisualizer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    height: 80,
+    marginBottom: 20,
+  },
+  audioBar: {
+    width: 8,
+    backgroundColor: "#007AFF",
+    marginHorizontal: 2,
+    borderRadius: 4,
+  },
+  recordingSubText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  overlayMicButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#ff4444",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
 });
