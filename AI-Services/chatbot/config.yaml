@@ -1,15 +1,16 @@
-model_name: "gemini-2.5-flash"
-api_key: "AIzaSyBCT4kIppoW6VMRr84pZQD8vG2jnlY-gu8"
-#AIzaSyBCT4kIppoW6VMRr84pZQD8vG2jnlY-gu8
-
-# Generation parameters used by chat.py
-temperature: 0.7
-top_p: 1.0
-top_k: 40
-candidate_count: 1
-presence_penalty: 0.0
-frequency_penalty: 0.0
+api_key: AIzaSyBCT4kIppoW6VMRr84pZQD8vG2jnlY-gu8
 buffer_percentage: 0.1
-
-# ChatBot behavior
+candidate_count: 1
+frequency_penalty: 0.0
+model_context_window:
+  context_window: 1M tokens
+  max_input_tokens: 1048576
+  max_output_tokens: 8192
+  model_name: gemini-2.5-flash
+  note: Known model
+model_name: gemini-2.5-flash
+presence_penalty: 0.0
 summary_threshold: 11
+temperature: 0.7
+top_k: 40
+top_p: 1.0

@@ -72,7 +72,7 @@ export default function ChatScreen() {
 
     try {
       console.log("Sending message to server:", userMsg);
-      const res = await fetch("http://192.168.0.89:8000/chat", {
+      const res = await fetch("http://192.168.0.90:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg }),
@@ -128,10 +128,13 @@ export default function ChatScreen() {
     }
   };
 
-  // Stop Recording and save as MP3
+  // Stop Recording and send to API
   const stopRecording = async () => {
     console.log("Stopping recording...");
     if (!recordingRef.current) return;
+
+    // Immediately hide the overlay by setting isRecording to false
+    setIsRecording(false);
 
     try {
       await recordingRef.current.stopAndUnloadAsync();
@@ -154,13 +157,14 @@ export default function ChatScreen() {
         
         console.log("MP3 file saved to:", mp3FilePath);
         
-        // Add a message to chat indicating voice recording was saved
+        // Add a message to chat indicating processing
         setMessages(prev => [...prev, { 
           role: "system", 
-          text: `🎤 Voice recording saved as ${mp3FileName}` 
+          text: "🎤 Processing voice recording..." 
         }]);
         
-        // TODO: Send MP3 file to Python server
+        // Send MP3 file to API
+        await sendAudioToAPI(mp3FilePath, mp3FileName);
         
       } else {
         throw new Error("Recording URI is null");
@@ -173,8 +177,109 @@ export default function ChatScreen() {
         text: "❌ Voice recording failed" 
       }]);
     } finally {
-      setIsRecording(false);
+      // Clean up the recording reference
       recordingRef.current = null;
+    }
+  };
+
+  // Send audio file to API
+  const sendAudioToAPI = async (filePath: string, fileName: string) => {
+    try {
+      const formData = new FormData();
+      
+      // The key must be 'audio_file' as per your API documentation
+      formData.append('audio_file', {
+        uri: filePath,
+        type: 'audio/mp3',
+        name: fileName,
+      } as any);
+      
+      console.log("Sending audio to API...");
+      
+      const apiUrl = "https://b32a230878c8.ngrok-free.app/transcribe/";
+      
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        body: formData,
+        // Do NOT set Content-Type manually for FormData, React Native handles it.
+        // Add the ngrok header.
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+      
+      console.log("API Response status:", response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log("API Response:", result);
+      
+      // Update chat with transcription result
+      setMessages(prev => [...prev, { 
+        role: "system", 
+        text: `✅ Audio transcribed successfully!` 
+      }]);
+      
+      // If the API returns transcribed text, add it as a user message and send to chatbot
+      if (result.transcription || result.text || typeof result === 'string') {
+        const transcribedText = result.transcription || result.text || result;
+        
+        // Add transcribed text as user message
+        setMessages(prev => [...prev, { 
+          role: "user", 
+          text: transcribedText 
+        }]);
+        
+        // Automatically send the transcribed text to your chatbot API
+        await sendTranscribedMessageToChatbot(transcribedText);
+      }
+      
+    } catch (error) {
+      console.error("Error sending audio to API:", error);
+      setMessages(prev => [...prev, { 
+        role: "system", 
+        text: "❌ Failed to transcribe audio. Please try again." 
+      }]);
+      Alert.alert('Error', 'Failed to send audio to transcription service');
+    }
+  };
+
+  // Send transcribed message to chatbot
+  const sendTranscribedMessageToChatbot = async (transcribedText: string) => {
+    try {
+      console.log("Sending transcribed message to chatbot:", transcribedText);
+      
+      const res = await fetch("http://192.168.0.89:8000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: transcribedText }),
+      });
+      
+      console.log("Chatbot response status:", res.status);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log("Received chatbot response:", data);
+      
+      // Add bot response to messages
+      setMessages(prev => [...prev, { 
+        role: "bot", 
+        text: data.reply 
+      }]);
+      
+    } catch (err) {
+      console.error("Chatbot error:", err);
+      setMessages(prev => [...prev, { 
+        role: "bot", 
+        text: "⚠️ Sorry, I'm having trouble connecting to the chatbot. Please try again." 
+      }]);
     }
   };
 
