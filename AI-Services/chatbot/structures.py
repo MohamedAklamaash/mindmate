@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel , Field
 from typing import Dict, Any, List
 
 
@@ -16,7 +16,7 @@ class Category(BaseModel):
     user_message: str
     chat_history: Any
 
-from pydantic import Field
+
 
 class ConversationInsights(BaseModel):
     """
@@ -70,3 +70,8 @@ class ConversationInsights(BaseModel):
         default=None,
         description="An additional field for storing extra information or metadata related to the conversation insights."
     )
+
+
+class PersonalSummary(BaseModel):
+    summary: str
+    insights: ConversationInsights

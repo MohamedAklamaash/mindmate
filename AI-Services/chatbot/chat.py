@@ -122,7 +122,19 @@ class ChatCompletionBase(ABC):
         # Determine input type and prepare content accordingly
         if hasattr(input, '__class__') and input.__class__.__name__ == 'Analysis':
             # For Analysis: combine specialised_prompt, user_query, and memory
-            content = f"{input.specialised_prompt}\n\nUser Query: {input.user_query}\n\nMemory Context: {input.memory}"
+            if input.memory has question_info:
+                logger.info("chat.invoke_model.call input_type=Analysis question_info=True")
+                messages=input.memory['messages']
+                previous_context = input.memory['previous_context']
+                previous_insights = input.memory['previous_insights']
+                question_info = input.memory['question_info']
+            else:
+                messages = input.memory['messages']
+                previous_context = input.memory['previous_context']
+                previous_insights = input.memory['previous_insights']
+                question_info = None
+
+            content = f"{input.specialised_prompt}\n\nUser Query: {input.user_query}\n\nMessages: {messages}\n\nPrevious Context: {previous_context}\n\nPrevious Insights: {previous_insights}\n\nQuestion Info: {question_info}"
             system_prompt = SYSTEM_PROMPT_ANALYSIS
             
         elif hasattr(input, '__class__') and input.__class__.__name__ == 'Summarise':
@@ -362,7 +374,7 @@ class ChatCompletionBase(ABC):
             "note": model_context.get("note", "Known model")
         }
     
-    def get_safe_input_tokens(self,) -> int:
+    def get_safe_input_tokens(self, buffer_percentage: float = 0.1) -> int:
         """
         Get a safe number of input tokens to use, leaving buffer for output.
         
@@ -372,7 +384,6 @@ class ChatCompletionBase(ABC):
         Returns:
             int: Safe number of input tokens to use
         """
-        buffer_percentage = self.config.get('buffer_percentage', 0.1)
         context_info = self.get_model_context_window()
         max_input_tokens = context_info['max_input_tokens']
         

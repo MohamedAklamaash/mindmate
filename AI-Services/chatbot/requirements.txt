@@ -8,6 +8,9 @@ pydantic>=2.0.0
 # Configuration file parsing
 PyYAML>=6.0
 
+# Firebase Admin SDK
+firebase-admin>=6.5.0
+
 # Standard library imports (no installation needed):
 # - typing
 # - datetime
