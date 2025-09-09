@@ -132,10 +132,10 @@ const styles = StyleSheet.create({
   optionLabelActive: { color: 'white' },
   otherWrapper: { marginTop: 4 },
   otherInput: { borderRadius: 16, borderWidth: 2, borderColor: '#E5E7EB', paddingVertical: 10, paddingHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.9)' },
-  buttonWrapper: { width: '100%', marginTop: 10 },
+  buttonWrapper: { width: '100%', marginTop: 10 ,marginBottom: 20,},
   primaryButton: { borderRadius: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', opacity: 1 },
   primaryButtonPressed: { opacity: 0.6 },
-  primaryButtonText: { color: 'white', fontWeight: '600', fontSize: 14,marginBottom: 10 },
+  primaryButtonText: { color: 'white', fontWeight: '600', fontSize: 14},
 });
 
 

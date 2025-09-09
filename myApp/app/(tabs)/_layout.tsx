@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons,FontAwesome5  } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -15,19 +16,34 @@ export default function TabLayout() {
   const userType = useUserStore((state) => state.userType);
 
   return (
+    <> 
+      <StatusBar hidden />
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: true,
+        tabBarActiveTintColor: '#4F46E5', // Purple color from the first image
+        tabBarInactiveTintColor: '#6B7280', // Gray color for inactive tabs
+        headerShown: false, // Remove the top header/title bar
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+          height: Platform.OS === 'ios' ? 85 : 75,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+          paddingTop: 6,
+          //marginBottom: 10, // Raise the tab bar above the bottom edge
+          //marginHorizontal: 16, // Add horizontal margin for floating effect
+          borderRadius: 30, // Rounded corners for floating look
+          //shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 8,
+          position: 'absolute',
+          left: 0,
+          right: 0,
+        },
       }}>
       <Tabs.Screen
         name="index"
@@ -36,30 +52,32 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="explore"
+        <Tabs.Screen
+        name="chat"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color, size }) => (<Ionicons name="stats-chart" size={size} color={color} />), 
-           href: userType === 'user' ? '/explore' : null,
+          title: 'Chat',
+          tabBarIcon: ({ color }) =>  <Ionicons name="chatbubble-outline" size={22} color={color} />,
+          href: userType === 'user' ? '/chat' : null,
+          tabBarStyle: { display: 'none' }, // Hide tab bar on chat screen
+        }}
+      />
+      <Tabs.Screen
+        name="Resources"
+        options={{
+          title: 'Resources',
+          tabBarIcon: ({ color, size }) => (<Ionicons name="library" size={size} color={color} />), 
+          href: userType === 'user' ? '/Resources' : null,
         }}
       />
       <Tabs.Screen
         name="therapist"
         options={{
           title: 'Therapist',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.2.fill" color={color} />,
+          tabBarIcon: ({ color }) =>  <FontAwesome5 name="stethoscope" size={22} color={color} />,
           href: userType === 'user' ? '/therapist' : null,
         }}
       />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-          href: userType === 'user' ? '/chat' : null,
-        }}
-      />
+  
       <Tabs.Screen
         name="clients"
         options={{
@@ -77,5 +95,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

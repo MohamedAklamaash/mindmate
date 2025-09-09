@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, Alert, ScrollView, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, Alert, ScrollView, SafeAreaView, RefreshControl, ActivityIndicator, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUserStore } from '@/store/userStore';
@@ -594,6 +594,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? 25 : 0, // Add spacing from status bar on Android
   },
   mainContent: {
     flex: 1,

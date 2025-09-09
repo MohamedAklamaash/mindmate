@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl, Pressable, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAllAvailableTherapists, bookTherapistSession, getUserAllBookedSessions, checkUserTimeConflict } from '@/services/firebaseService';
@@ -288,9 +288,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? 25 : 10, // Add spacing from status bar on Android
   },
   header: {
     padding: 20,
+    paddingTop: 30,
     paddingBottom: 10,
   },
   title: {

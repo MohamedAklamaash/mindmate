@@ -4,6 +4,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SplashScreen } from '@/components/SplashScreen';
@@ -24,6 +26,21 @@ import { useUserStore } from '@/store/userStore';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const hideNavigationBar = async () => {
+        try {
+          await NavigationBar.setBehaviorAsync('overlay-swipe');
+          await NavigationBar.setVisibilityAsync('hidden');
+        } catch (e) {
+          console.warn('NavigationBar control not available:', e);
+        }
+      };
+      hideNavigationBar();
+    }
+  }, []);
+
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -116,7 +133,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style="light" backgroundColor="#000000" />
     </ThemeProvider>
   );
 }

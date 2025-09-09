@@ -1,6 +1,6 @@
 // ChatScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -16,29 +16,32 @@ export default function ChatScreen() {
 
   // Audio visualization animations
   const animatedValues = useRef(
-    Array.from({ length: 10 }, () => new Animated.Value(0.1))
+    Array.from({ length: 3 }, () => new Animated.Value(0.3))
   ).current;
 
   // Start audio visualization animation
   const startAudioAnimation = () => {
-    const animateBar = (animatedValue: Animated.Value) => {
+    const animateDot = (animatedValue: Animated.Value, delay: number) => {
       Animated.loop(
         Animated.sequence([
+          Animated.delay(delay),
           Animated.timing(animatedValue, {
-            toValue: Math.random() * 0.8 + 0.2,
-            duration: 200 + Math.random() * 300,
+            toValue: 1,
+            duration: 600,
             useNativeDriver: false,
           }),
           Animated.timing(animatedValue, {
-            toValue: 0.1 + Math.random() * 0.3,
-            duration: 200 + Math.random() * 300,
+            toValue: 0.3,
+            duration: 600,
             useNativeDriver: false,
           }),
         ])
       ).start();
     };
 
-    animatedValues.forEach(animateBar);
+    animatedValues.forEach((animatedValue, index) => {
+      animateDot(animatedValue, index * 200);
+    });
   };
 
   // Stop audio visualization animation
@@ -46,7 +49,7 @@ export default function ChatScreen() {
     animatedValues.forEach((animatedValue) => {
       animatedValue.stopAnimation();
       Animated.timing(animatedValue, {
-        toValue: 0.1,
+        toValue: 0.3,
         duration: 200,
         useNativeDriver: false,
       }).start();
@@ -294,149 +297,348 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={messages}
-        keyExtractor={(_, index) => index.toString()}
-        renderItem={({ item }) => (
-          <View style={[
-            styles.message, 
-            item.role === "user" ? styles.user : 
-            item.role === "system" ? styles.system : styles.bot
-          ]}>
-            <Text style={styles.messageText}>{item.text}</Text>
+      {/* Header with title and close button */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>WittyMate AI</Text>
+            <View style={styles.onlineBadge}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.onlineText}>Online</Text>
+            </View>
           </View>
-        )}
-        contentContainerStyle={styles.messagesContainer}
-      />
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => router.push('/')} // Navigate to home tab
+          >
+            <Ionicons name="close" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Chat messages container */}
+      <View style={styles.messagesWrapper}>
+        <FlatList
+          data={messages}
+          keyExtractor={(_, index) => index.toString()}
+          renderItem={({ item }) => (
+            <View style={[
+              styles.messageContainer,
+              item.role === "user" ? styles.userMessageContainer : styles.botMessageContainer
+            ]}>
+              <View style={[
+                styles.message, 
+                item.role === "user" ? styles.userMessage : 
+                item.role === "system" ? styles.systemMessage : styles.botMessage
+              ]}>
+                <Text style={[
+                  styles.messageText,
+                  item.role === "user" ? styles.userMessageText : styles.botMessageText
+                ]}>{item.text}</Text>
+              </View>
+            </View>
+          )}
+          contentContainerStyle={styles.messagesContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+
+      {/* Fixed input at bottom */}
+      <View style={styles.inputWrapper}>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputBox}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder="How are you feeling today?"
+              placeholderTextColor="#999"
+              editable={!isLoading}
+              onSubmitEditing={sendMessage}
+              returnKeyType="send"
+              multiline={false}
+            />
+            <TouchableOpacity 
+              style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]} 
+              onPress={sendMessage}
+              disabled={isLoading || !input.trim()}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="send" size={16} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {/* Voice and Reset buttons */}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.voiceButton]} 
+            onPress={handleMicPress}
+          >
+            <Ionicons 
+              name={isRecording ? "stop" : "mic"} 
+              size={20} 
+              color="#fff" 
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.resetButton]}
+            onPress={() => {
+              setMessages([]);
+              setInput("");
+            }}
+          >
+            <Ionicons name="refresh" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Audio Visualization Overlay */}
       {isRecording && (
         <View style={styles.audioOverlay}>
           <View style={styles.audioVisualizerContainer}>
-            <Text style={styles.recordingText}>🎤 Recording...</Text>
-            <View style={styles.audioVisualizer}>
-              {animatedValues.map((animatedValue, index) => (
+            {/* Blue microphone icon */}
+            <View style={styles.micIconContainer}>
+              <Ionicons name="mic" size={32} color="#fff" />
+            </View>
+            
+            {/* Listening text */}
+            <Text style={styles.listeningText}>Listening...</Text>
+            
+            {/* Subtitle */}
+            <Text style={styles.listeningSubtext}>Speak now, I'm listening</Text>
+            
+            {/* Animated dots */}
+            <View style={styles.dotsContainer}>
+              {[0, 1, 2].map((index) => (
                 <Animated.View
                   key={index}
                   style={[
-                    styles.audioBar,
+                    styles.dot,
                     {
-                      height: animatedValue.interpolate({
+                      opacity: animatedValues[index].interpolate({
                         inputRange: [0, 1],
-                        outputRange: [10, 80],
+                        outputRange: [0.3, 1],
                       }),
                     },
                   ]}
                 />
               ))}
             </View>
-            <Text style={styles.recordingSubText}>Tap stop button to finish</Text>
             
-            {/* Mic Button in Overlay */}
+            {/* Cancel Button */}
             <TouchableOpacity 
-              style={styles.overlayMicButton} 
+              style={styles.cancelButton} 
               onPress={handleMicPress}
             >
-              <Ionicons 
-                name="stop" 
-                size={32} 
-                color="#fff" 
-              />
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Type your message..."
-          editable={!isLoading}
-          onSubmitEditing={sendMessage}
-          returnKeyType="send"
-        />
-        <TouchableOpacity 
-          style={[
-            styles.micButton,
-            isRecording ? styles.micButtonRecording : styles.micButtonIdle
-          ]} 
-          onPress={handleMicPress}
-        >
-          <Ionicons 
-            name={isRecording ? "stop" : "mic"} 
-            size={24} 
-            color={isRecording ? "#fff" : "#007AFF"} 
-          />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.sendButton, isLoading && styles.sendButtonDisabled]} 
-          onPress={sendMessage}
-          disabled={isLoading || !input.trim()}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.sendText}>Send</Text>
-          )}
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  messagesContainer: { padding: 10 },
-  message: { padding: 10, marginVertical: 5, borderRadius: 8, maxWidth: "80%" },
-  user: { alignSelf: "flex-end", backgroundColor: "#DCF8C6" },
-  bot: { alignSelf: "flex-start", backgroundColor: "#E5E5EA" },
-  system: { alignSelf: "center", backgroundColor: "#FFF3CD", borderColor: "#FFEAA7", borderWidth: 1 },
-  messageText: { fontSize: 16 },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#f8f9fa",
+    //paddingTop: Platform.OS === 'android' ? 25 : 0, // Add spacing from status bar on Android
+  },
+  
+  // Header styles
+  header: {
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+    paddingHorizontal: 10,
+    paddingVertical: 20,
+    },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 30,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212529",
+    marginBottom: 10,
+  },
+  onlineBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#d4edda",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#28a745",
+    marginRight: 4,
+  },
+  onlineText: {
+    fontSize: 12,
+    color: "#155724",
+    fontWeight: "500",
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f8f9fa",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  
+  // Messages styles
+  messagesWrapper: {
+    flex: 1,
+    backgroundColor: "#f8f9fa",
+    marginBottom: 80, // Add margin to prevent overlap with input
+  },
+  messagesContainer: { 
+    padding: 16,
+    paddingBottom: 20, // Reduced padding since we have margin
+  },
+  messageContainer: {
+    marginVertical: 4,
+  },
+  userMessageContainer: {
+    alignItems: "flex-end",
+  },
+  botMessageContainer: {
+    alignItems: "flex-start",
+  },
+  message: { 
+    maxWidth: "80%",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  userMessage: { 
+    backgroundColor: "#007bff",
+    borderBottomRightRadius: 6,
+  },
+  botMessage: { 
+    backgroundColor: "white",
+    borderBottomLeftRadius: 6,
+  },
+  systemMessage: { 
+    backgroundColor: "#fff3cd",
+    borderColor: "#ffeaa7",
+    borderWidth: 1,
+    alignSelf: "center",
+  },
+  messageText: { 
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  userMessageText: {
+    color: "white",
+  },
+  botMessageText: {
+    color: "#212529",
+  },
+  
+  // Input styles
+  inputWrapper: {
+    height: 100,
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderTopColor: "#e9ecef",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+    //marginBottom: Platform.OS === 'ios' ? 0 : 18, // Extra margin for Android
+  },
   inputContainer: {
     flexDirection: "row",
-    borderTopWidth: 1,
-    borderColor: "#ccc",
-    padding: 5,
-    backgroundColor: "#f9f9f9",
+    alignItems: "flex-end",
+    gap: 8,
   },
-  input: { flex: 1, padding: 10, fontSize: 16 },
-  micButton: {
-    paddingHorizontal: 10,
-    justifyContent: "center",
-    marginLeft: 5,
-    borderRadius: 20,
-    borderWidth: 2,
+  inputBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  micButtonIdle: {
-    backgroundColor: "#fff",
-    borderColor: "#007AFF",
-  },
-  micButtonRecording: {
-    backgroundColor: "#ff4444",
-    borderColor: "#ff4444",
+  input: { 
+    flex: 1, 
+    fontSize: 16,
+    color: "#212529",
+    paddingVertical: 8,
+    maxHeight: 100,
   },
   sendButton: {
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 15,
+    backgroundColor: "#007bff",
+    borderRadius: 18,
+    width: 36,
+    height: 36,
+    alignItems: "center",
     justifyContent: "center",
-    borderRadius: 5,
-    marginLeft: 5,
+    marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: "#ccc",
+    backgroundColor: "#6c757d",
   },
-  sendText: { color: "#fff", fontWeight: "bold" },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  voiceButton: {
+    backgroundColor: "#8b5cf6",
+    borderColor: "#8b5cf6",
+  },
+  resetButton: {
+    backgroundColor: "white",
+    borderColor: "#dee2e6",
+  },
   
-  // Audio visualization overlay styles
+  // Audio overlay styles
   audioOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
@@ -444,55 +646,71 @@ const styles = StyleSheet.create({
   audioVisualizerContainer: {
     alignItems: "center",
     backgroundColor: "#fff",
-    padding: 30,
+    padding: 40,
     borderRadius: 20,
+    minWidth: 280,
     elevation: 10,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
-  recordingText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#ff4444",
-    marginBottom: 20,
-  },
-  audioVisualizer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
+  micIconContainer: {
+    width: 80,
     height: 80,
-    marginBottom: 20,
-  },
-  audioBar: {
-    width: 8,
-    backgroundColor: "#007AFF",
-    marginHorizontal: 2,
-    borderRadius: 4,
-  },
-  recordingSubText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  overlayMicButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "#ff4444",
+    borderRadius: 40,
+    backgroundColor: "#4285F4",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 5,
-    shadowColor: "#000",
+    marginBottom: 24,
+    elevation: 4,
+    shadowColor: "#4285F4",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  listeningText: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  listeningSubtext: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 32,
+  },
+  dotsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 32,
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#4285F4",
+  },
+  cancelButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: "#495057",
+    fontWeight: "500",
   },
 });
