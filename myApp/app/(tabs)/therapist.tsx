@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAllAvailableTherapists, bookTherapistSession, getUserAllBookedSessions, checkUserTimeConflict } from '@/services/firebaseService';
 import { useUserStore } from '@/store/userStore';
+import { useThemeStore, getThemeColors } from '@/store/themeStore';
 
 interface TherapistData {
   id: string;
@@ -29,6 +30,50 @@ export default function TherapistScreen() {
   const [userBookedSessions, setUserBookedSessions] = useState<any[]>([]);
   
   const user = useUserStore((state) => state.user);
+
+  // Theme support
+  const selectedTheme = useThemeStore((state) => state.selectedTheme);
+  const themeColors = getThemeColors(selectedTheme);
+
+  // Dynamic gradient based on theme
+  const getBackgroundGradient = (): [string, string, string] => {
+    switch (selectedTheme) {
+      case 'forest':
+        return ['#F0FDF4', '#ECFDF5', '#D1FAE5']; // Green gradient
+      case 'ocean':
+        return ['#EBF8FF', '#DBEAFE', '#BFDBFE']; // Blue gradient
+      case 'retro':
+        return ['#FEF3C7', '#FDE68A', '#F59E0B']; // Orange gradient
+      case 'blossom':
+        return ['#FDF2F8', '#FCE7F3', '#F9A8D4']; // Pink gradient
+      case 'dark':
+        return ['#1F2937', '#374151', '#4B5563']; // Dark gradient
+      case 'light':
+        return ['#F9FAFB', '#F3F4F6', '#E5E7EB']; // Light gradient
+      default:
+        return ['#EBF4FF', '#F3E8FF', '#FDF2F8']; // Default gradient
+    }
+  };
+
+  // Dynamic accent color for buttons and icons
+  const getAccentColor = (): string => {
+    switch (selectedTheme) {
+      case 'forest':
+        return '#059669'; // Emerald
+      case 'ocean':
+        return '#0891B2'; // Cyan
+      case 'retro':
+        return '#EA580C'; // Orange
+      case 'blossom':
+        return '#DB2777'; // Pink
+      case 'dark':
+        return '#3B82F6'; // Blue
+      case 'light':
+        return '#4F46E5'; // Indigo
+      default:
+        return '#4F46E5'; // Default indigo
+    }
+  };
 
   const fetchTherapists = async () => {
     try {
@@ -141,12 +186,14 @@ export default function TherapistScreen() {
   };
 
   if (isLoading) {
+    const gradientColors = getBackgroundGradient();
+    
     return (
-      <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+      <LinearGradient colors={gradientColors} style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4F46E5" />
-            <Text style={styles.loadingText}>Loading therapists...</Text>
+            <ActivityIndicator size="large" color={getAccentColor()} />
+            <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>Loading therapists...</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -154,11 +201,11 @@ export default function TherapistScreen() {
   }
 
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient colors={getBackgroundGradient()} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.title}>Available Therapists</Text>
-          <Text style={styles.subtitle}>Find the right therapist for you</Text>
+          <Text style={[styles.title, { color: themeColors.text }]}>Available Therapists</Text>
+          <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>Find the right therapist for you</Text>
         </View>
         
         <ScrollView 
@@ -170,32 +217,38 @@ export default function TherapistScreen() {
         >
           {therapists.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="account-search" size={64} color="#9CA3AF" />
-              <Text style={styles.emptyText}>No therapists available</Text>
-              <Text style={styles.emptySubtext}>Check back later for new therapists</Text>
+              <MaterialCommunityIcons name="account-search" size={64} color={themeColors.textMuted} />
+              <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>No therapists available</Text>
+              <Text style={[styles.emptySubtext, { color: themeColors.textMuted }]}>Check back later for new therapists</Text>
             </View>
           ) : (
             therapists.map((therapist) => (
-              <View key={therapist.id} style={styles.therapistCard}>
+              <View key={therapist.id} style={[styles.therapistCard, { 
+                backgroundColor: themeColors.surface,
+                borderColor: themeColors.border,
+                borderWidth: 1
+              }]}>
                 <View style={styles.cardHeader}>
-                  <View style={styles.avatarContainer}>
-                    <MaterialCommunityIcons name="account-tie" size={32} color="#4F46E5" />
+                  <View style={[styles.avatarContainer, { 
+                    backgroundColor: selectedTheme === 'dark' ? themeColors.background : themeColors.backgroundSecondary
+                  }]}>
+                    <MaterialCommunityIcons name="account-tie" size={32} color={getAccentColor()} />
                   </View>
                   <View style={styles.nameContainer}>
-                    <Text style={styles.therapistName}>{therapist.name || 'null'}</Text>
-                    <Text style={styles.therapistTitle}>Licensed Therapist</Text>
+                    <Text style={[styles.therapistName, { color: themeColors.text }]}>{therapist.name || 'null'}</Text>
+                    <Text style={[styles.therapistTitle, { color: themeColors.textSecondary }]}>Licensed Therapist</Text>
                   </View>
                 </View>
 
                 <View style={styles.descriptionSection}>
-                  <Text style={styles.sectionLabel}>Description:</Text>
-                  <Text style={styles.descriptionText}>
-                    {therapist.description || 'null'}
+                  <Text style={[styles.sectionLabel, { color: themeColors.text }]}>Description:</Text>
+                  <Text style={[styles.descriptionText, { color: themeColors.textSecondary }]}>
+                    {therapist.description || 'This is ' + therapist.name}
                   </Text>
                 </View>
 
-                <View style={styles.scheduleSection}>
-                  <Text style={styles.sectionLabel}>Available Services:</Text>
+                <View style={[styles.scheduleSection, { borderTopColor: themeColors.border }]}>
+                  <Text style={[styles.sectionLabel, { color: themeColors.text }]}>Available Services:</Text>
                   {therapist.schedules && therapist.schedules.length > 0 ? (
                     therapist.schedules.map((schedule, index) => {
                       // Check if user has a conflict with this schedule
@@ -207,38 +260,42 @@ export default function TherapistScreen() {
                       );
 
                       return (
-                        <View key={schedule.id || index} style={styles.scheduleItem}>
+                        <View key={schedule.id || index} style={[styles.scheduleItem, { 
+                          backgroundColor: selectedTheme === 'dark' ? themeColors.surface : themeColors.backgroundSecondary,
+                          borderColor: themeColors.border,
+                          borderWidth: 1
+                        }]}>
                           <View style={styles.scheduleRow}>
-                            <Text style={styles.scheduleLabel}>Field Type:</Text>
-                            <Text style={styles.scheduleValue}>{schedule.fieldType || 'null'}</Text>
+                            <Text style={[styles.scheduleLabel, { color: themeColors.text }]}>Field Type:</Text>
+                            <Text style={[styles.scheduleValue, { color: themeColors.textSecondary }]}>{schedule.fieldType || 'One'}</Text>
                           </View>
                           <View style={styles.scheduleRow}>
-                            <Text style={styles.scheduleLabel}>Date:</Text>
-                            <Text style={styles.scheduleValue}>
+                            <Text style={[styles.scheduleLabel, { color: themeColors.text }]}>Date:</Text>
+                            <Text style={[styles.scheduleValue, { color: themeColors.textSecondary }]}>
                               {schedule.date ? new Date(schedule.date).toLocaleDateString('en-US', {
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric'
-                              }) : 'null'}
+                              }) : 'Thu, Aug 28'}
                             </Text>
                           </View>
                           <View style={styles.scheduleRow}>
-                            <Text style={styles.scheduleLabel}>Start Time:</Text>
-                            <Text style={styles.scheduleValue}>{formatTime(schedule.startTime) || 'null'}</Text>
+                            <Text style={[styles.scheduleLabel, { color: themeColors.text }]}>Start Time:</Text>
+                            <Text style={[styles.scheduleValue, { color: themeColors.textSecondary }]}>{formatTime(schedule.startTime) || '9:00 AM'}</Text>
                           </View>
                           <View style={styles.scheduleRow}>
-                            <Text style={styles.scheduleLabel}>Duration:</Text>
-                            <Text style={styles.scheduleValue}>{formatDuration(schedule.duration) || 'null'}</Text>
+                            <Text style={[styles.scheduleLabel, { color: themeColors.text }]}>Duration:</Text>
+                            <Text style={[styles.scheduleValue, { color: themeColors.textSecondary }]}>{formatDuration(schedule.duration) || '1hr'}</Text>
                           </View>
                           <View style={styles.scheduleRow}>
-                            <Text style={styles.scheduleLabel}>Price:</Text>
-                            <Text style={styles.priceText}>${schedule.price || 'null'}</Text>
+                            <Text style={[styles.scheduleLabel, { color: themeColors.text }]}>Price:</Text>
+                            <Text style={[styles.priceText, { color: getAccentColor() }]}>${schedule.price || '23'}</Text>
                           </View>
                           
                           {hasConflict && (
-                            <View style={styles.conflictWarning}>
-                              <MaterialCommunityIcons name="alert-circle" size={16} color="#DC2626" />
-                              <Text style={styles.conflictText}>
+                            <View style={[styles.conflictWarning, { backgroundColor: themeColors.error + '20' }]}>
+                              <MaterialCommunityIcons name="alert-circle" size={16} color={themeColors.error} />
+                              <Text style={[styles.conflictText, { color: themeColors.error }]}>
                                 You have a booking conflict at this time
                               </Text>
                             </View>
@@ -247,8 +304,9 @@ export default function TherapistScreen() {
                           <Pressable
                             style={({ pressed }) => [
                               styles.bookButton,
-                              pressed && styles.bookButtonPressed,
-                              (bookingLoading === schedule.id || hasConflict) && styles.bookButtonDisabled
+                              { backgroundColor: getAccentColor() },
+                              pressed && [styles.bookButtonPressed, { backgroundColor: getAccentColor() + 'CC' }],
+                              (bookingLoading === schedule.id || hasConflict) && [styles.bookButtonDisabled, { backgroundColor: themeColors.textMuted }]
                             ]}
                             onPress={() => handleBookSession(therapist.id, schedule.id, therapist.name, schedule)}
                             disabled={bookingLoading === schedule.id || hasConflict}
@@ -268,8 +326,12 @@ export default function TherapistScreen() {
                       );
                     })
                   ) : (
-                    <View style={styles.scheduleItem}>
-                      <Text style={styles.noScheduleText}>No schedules available</Text>
+                    <View style={[styles.scheduleItem, { 
+                      backgroundColor: selectedTheme === 'dark' ? themeColors.surface : themeColors.backgroundSecondary,
+                      borderColor: themeColors.border,
+                      borderWidth: 1
+                    }]}>
+                      <Text style={[styles.noScheduleText, { color: themeColors.textMuted }]}>No schedules available</Text>
                     </View>
                   )}
                 </View>
@@ -298,12 +360,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1F2937',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
     textAlign: 'center',
     marginTop: 4,
   },
@@ -314,7 +374,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6B7280',
     fontSize: 16,
   },
   scrollView: {
@@ -333,16 +392,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#9CA3AF',
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#D1D5DB',
     marginTop: 4,
   },
   therapistCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -364,7 +420,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -375,11 +430,9 @@ const styles = StyleSheet.create({
   therapistName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1F2937',
   },
   therapistTitle: {
     fontSize: 14,
-    color: '#6B7280',
     marginTop: 2,
   },
   descriptionSection: {
@@ -388,52 +441,53 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 8,
   },
   descriptionText: {
     fontSize: 14,
-    color: '#6B7280',
     lineHeight: 20,
     fontStyle: 'italic',
   },
   scheduleSection: {
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
     paddingTop: 16,
   },
   scheduleItem: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   scheduleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
+    alignItems: 'center',
   },
   scheduleLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: '600',
     flex: 1,
   },
   scheduleValue: {
     fontSize: 14,
-    color: '#6B7280',
     flex: 2,
     textAlign: 'right',
   },
   noScheduleText: {
     fontSize: 14,
-    color: '#9CA3AF',
     fontStyle: 'italic',
     textAlign: 'center',
   },
   priceText: {
-    fontSize: 14,
-    color: '#059669',
+    fontSize: 16,
     fontWeight: 'bold',
     flex: 2,
     textAlign: 'right',
@@ -441,7 +495,6 @@ const styles = StyleSheet.create({
   conflictWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
     padding: 8,
     borderRadius: 6,
     marginTop: 8,
@@ -450,30 +503,36 @@ const styles = StyleSheet.create({
   },
   conflictText: {
     fontSize: 12,
-    color: '#DC2626',
     fontWeight: '500',
     flex: 1,
   },
   bookButton: {
-    backgroundColor: '#4F46E5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   bookButtonPressed: {
-    backgroundColor: '#3730A3',
+    opacity: 0.8,
   },
   bookButtonDisabled: {
-    backgroundColor: '#A5B4FC',
+    opacity: 0.6,
   },
   bookButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

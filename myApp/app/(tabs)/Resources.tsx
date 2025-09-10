@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useThemeStore, getThemeColors } from '@/store/themeStore';
 
 interface Course {
   id: string;
@@ -48,6 +49,30 @@ type ContextType = 'general' | 'stress' | 'anxiety' | 'depression' | 'motivation
 export default function ResourcesScreen() {
   const [isTopicsDropdownOpen, setIsTopicsDropdownOpen] = useState(false);
   const [currentContext, setCurrentContext] = useState<ContextType>('general');
+  
+  // Theme support
+  const selectedTheme = useThemeStore((state) => state.selectedTheme);
+  const themeColors = getThemeColors(selectedTheme);
+  
+  // Dynamic gradient based on theme
+  const getBackgroundGradient = (): [string, string, string] => {
+    switch (selectedTheme) {
+      case 'forest':
+        return ['#F0FDF4', '#ECFDF5', '#D1FAE5']; // Green gradient
+      case 'ocean':
+        return ['#EBF8FF', '#DBEAFE', '#BFDBFE']; // Blue gradient
+      case 'retro':
+        return ['#FEF3C7', '#FDE68A', '#F59E0B']; // Orange gradient
+      case 'blossom':
+        return ['#FDF2F8', '#FCE7F3', '#F9A8D4']; // Pink gradient
+      case 'dark':
+        return ['#1F2937', '#374151', '#4B5563']; // Dark gradient
+      case 'light':
+        return ['#F9FAFB', '#F3F4F6', '#E5E7EB']; // Light gradient
+      default:
+        return ['#EBF4FF', '#F3E8FF', '#FDF2F8']; // Default gradient
+    }
+  };
 
   // Sample data - replace with actual data from your backend
   const availableCourses: Course[] = [
@@ -235,7 +260,54 @@ export default function ResourcesScreen() {
     }
   };
 
-  const getIconColor = (type: string) => {
+  const getIconColor = (type: string, theme?: string) => {
+    if (theme === 'forest') {
+      switch (type) {
+        case 'video':
+          return '#059669'; // emerald-600
+        case 'guide':
+          return '#10B981'; // green-500
+        case 'workbook':
+          return '#16A34A'; // green-600
+        default:
+          return '#047857'; // green-700
+      }
+    } else if (theme === 'ocean') {
+      switch (type) {
+        case 'video':
+          return '#0891B2'; // cyan-600
+        case 'guide':
+          return '#3B82F6'; // blue-500
+        case 'workbook':
+          return '#2DD4BF'; // teal-400
+        default:
+          return '#0E7490'; // cyan-700
+      }
+    } else if (theme === 'retro') {
+      switch (type) {
+        case 'video':
+          return '#EA580C'; // orange-600
+        case 'guide':
+          return '#F59E0B'; // amber-500
+        case 'workbook':
+          return '#FACC15'; // yellow-400
+        default:
+          return '#D97706'; // amber-600
+      }
+    } else if (theme === 'blossom') {
+      switch (type) {
+        case 'video':
+          return '#DB2777'; // pink-600
+        case 'guide':
+          return '#F43F5E'; // rose-500
+        case 'workbook':
+          return '#C084FC'; // purple-400
+        default:
+          return '#BE185D'; // pink-700
+      }
+    }
+    
+    // Default colors for other themes
     switch (type) {
       case 'video':
         return '#8B5CF6';
@@ -261,34 +333,34 @@ export default function ResourcesScreen() {
   };
 
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient colors={getBackgroundGradient()} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContainer}>
           <View style={styles.header}>
-            <Text style={styles.title}>Learning Resources</Text>
+            <Text style={[styles.title, { color: themeColors.text }]}>Learning Resources</Text>
           </View>
 
           {/* Quick Tips Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Quick Tips</Text>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Quick Tips</Text>
               <View style={styles.topicsContainer}>
                 {currentContext !== 'general' && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
+                  <View style={[styles.badge, { backgroundColor: themeColors.accent }]}>
+                    <Text style={[styles.badgeText, { color: themeColors.accentText }]}>
                       {currentContext.charAt(0).toUpperCase() + currentContext.slice(1)} Support
                     </Text>
                   </View>
                 )}
                 <Pressable 
-                  style={styles.dropdownButton}
+                  style={[styles.dropdownButton, { borderColor: themeColors.border }]}
                   onPress={() => setIsTopicsDropdownOpen(true)}
                 >
-                  <Text style={styles.dropdownButtonText}>Explore Topics</Text>
+                  <Text style={[styles.dropdownButtonText, { color: themeColors.textSecondary }]}>Explore Topics</Text>
                   <MaterialCommunityIcons 
                     name="chevron-down"
                     size={16} 
-                    color="#6B7280" 
+                    color={themeColors.textMuted} 
                   />
                 </Pressable>
               </View>
@@ -325,51 +397,66 @@ export default function ResourcesScreen() {
             </Modal>
 
             {/* Daily Inspiration */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconContainer}>
-                  <MaterialCommunityIcons name="lightbulb" size={20} color="#4F46E5" />
+                <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#D1FAE5' : '#EEF2FF' }]}>
+                  <MaterialCommunityIcons 
+                    name="lightbulb" 
+                    size={20} 
+                    color={selectedTheme === 'forest' ? themeColors.primary : "#4F46E5"} 
+                  />
                 </View>
-                <Text style={styles.cardTitle}>Daily Inspiration</Text>
+                <Text style={[styles.cardTitle, { color: themeColors.text }]}>Daily Inspiration</Text>
               </View>
-              <Text style={styles.quote}>"{currentTip.quote.text}"</Text>
-              <Text style={styles.author}>— {currentTip.quote.author}</Text>
+              <Text style={[styles.quote, { color: themeColors.textSecondary }]}>"{currentTip.quote.text}"</Text>
+              <Text style={[styles.author, { color: themeColors.textMuted }]}>— {currentTip.quote.author}</Text>
             </View>
 
             {/* Recommended Reading */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
               <View style={styles.cardHeader}>
-                <View style={[styles.iconContainer, { backgroundColor: '#DBEAFE' }]}>
-                  <MaterialCommunityIcons name="file-document" size={20} color="#3B82F6" />
+                <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#DCFCE7' : '#DBEAFE' }]}>
+                  <MaterialCommunityIcons 
+                    name="file-document" 
+                    size={20} 
+                    color={selectedTheme === 'forest' ? themeColors.secondary : "#3B82F6"} 
+                  />
                 </View>
-                <Text style={styles.cardTitle}>Recommended Reading</Text>
+                <Text style={[styles.cardTitle, { color: themeColors.text }]}>Recommended Reading</Text>
               </View>
-              <Text style={styles.cardContent}>{currentTip.article.title}</Text>
+              <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{currentTip.article.title}</Text>
               <View style={styles.cardFooter}>
-                <Text style={styles.sourceText}>{currentTip.article.source}</Text>
-                <Pressable style={styles.linkButton} onPress={() => openLink(currentTip.article.url)}>
-                  <Text style={styles.linkButtonText}>Read Article</Text>
+                <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>{currentTip.article.source}</Text>
+                <Pressable 
+                  style={[styles.linkButton, { backgroundColor: themeColors.primary }]} 
+                  onPress={() => openLink(currentTip.article.url)}
+                >
+                  <Text style={[styles.linkButtonText, { color: themeColors.primaryText }]}>Read Article</Text>
                 </Pressable>
               </View>
             </View>
 
             {/* Podcast Recommendation */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
               <View style={styles.cardHeader}>
-                <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
-                  <MaterialCommunityIcons name="volume-high" size={20} color="#10B981" />
+                <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#DCFCE7' : '#D1FAE5' }]}>
+                  <MaterialCommunityIcons 
+                    name="volume-high" 
+                    size={20} 
+                    color={selectedTheme === 'forest' ? themeColors.secondary : "#10B981"} 
+                  />
                 </View>
-                <Text style={styles.cardTitle}>Listen & Learn</Text>
+                <Text style={[styles.cardTitle, { color: themeColors.text }]}>Listen & Learn</Text>
               </View>
-              <Text style={styles.cardContent}>{currentTip.podcast.title}</Text>
+              <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{currentTip.podcast.title}</Text>
               <View style={styles.cardFooter}>
-                <Text style={styles.sourceText}>by {currentTip.podcast.host} • {currentTip.podcast.duration}</Text>
+                <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>by {currentTip.podcast.host} • {currentTip.podcast.duration}</Text>
                 <Pressable 
-                  style={[styles.linkButton, { backgroundColor: '#10B981' }]} 
+                  style={[styles.linkButton, { backgroundColor: themeColors.secondary }]} 
                   onPress={() => openLink(currentTip.podcast.spotifyUrl)}
                 >
-                  <MaterialCommunityIcons name="volume-high" size={12} color="white" />
-                  <Text style={[styles.linkButtonText, { color: 'white' }]}>Listen</Text>
+                  <MaterialCommunityIcons name="volume-high" size={12} color={themeColors.secondaryText} />
+                  <Text style={[styles.linkButtonText, { color: themeColors.secondaryText }]}>Listen</Text>
                 </Pressable>
               </View>
             </View>
@@ -377,25 +464,25 @@ export default function ResourcesScreen() {
 
           {/* Available Courses */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Available Courses</Text>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Available Courses</Text>
             {availableCourses.map((course) => (
-              <View key={course.id} style={styles.courseCard}>
+              <View key={course.id} style={[styles.courseCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
                 <View style={styles.courseHeader}>
-                  <View style={[styles.courseIconContainer, { backgroundColor: '#F3F4F6' }]}>
+                  <View style={[styles.courseIconContainer, { backgroundColor: themeColors.backgroundSecondary }]}>
                     <MaterialCommunityIcons 
                       name={getIcon(course.type) as any} 
                       size={24} 
-                      color={getIconColor(course.type)} 
+                      color={getIconColor(course.type, selectedTheme)} 
                     />
                   </View>
                   <View style={styles.courseInfo}>
-                    <Text style={styles.courseTitle}>{course.title}</Text>
-                    <Text style={styles.courseInstructor}>by {course.instructor}</Text>
-                    <Text style={styles.courseDuration}>{course.duration}</Text>
+                    <Text style={[styles.courseTitle, { color: themeColors.text }]}>{course.title}</Text>
+                    <Text style={[styles.courseInstructor, { color: themeColors.textSecondary }]}>by {course.instructor}</Text>
+                    <Text style={[styles.courseDuration, { color: themeColors.textMuted }]}>{course.duration}</Text>
                   </View>
                   <View style={styles.courseActions}>
-                    <View style={styles.pointsBadge}>
-                      <Text style={styles.pointsText}>+{course.points} pts</Text>
+                    <View style={[styles.pointsBadge, { backgroundColor: themeColors.accent }]}>
+                      <Text style={[styles.pointsText, { color: themeColors.accentText }]}>+{course.points} pts</Text>
                     </View>
                     {course.isCompleted && (
                       <View style={styles.completedContainer}>

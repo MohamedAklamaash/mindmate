@@ -10,17 +10,42 @@ import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
+import { useThemeStore, getThemeColors } from '@/store/themeStore';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const userType = useUserStore((state) => state.userType);
+  
+  // Get theme colors for dynamic tab bar styling
+  const selectedTheme = useThemeStore((state) => state.selectedTheme);
+  const themeColors = getThemeColors(selectedTheme);
+
+  // Dynamic accent color for active tab based on theme
+  const getTabBarActiveTintColor = (): string => {
+    switch (selectedTheme) {
+      case 'forest':
+        return '#059669'; // Emerald
+      case 'ocean':
+        return '#0891B2'; // Cyan
+      case 'retro':
+        return '#EA580C'; // Orange
+      case 'blossom':
+        return '#DB2777'; // Pink
+      case 'dark':
+        return '#3B82F6'; // Blue
+      case 'light':
+        return '#4F46E5'; // Indigo
+      default:
+        return '#4F46E5'; // Default indigo
+    }
+  };
 
   return (
     <> 
       <StatusBar hidden />
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#4F46E5', // Purple color from the first image
+        tabBarActiveTintColor: getTabBarActiveTintColor(), // Dynamic color based on theme
         tabBarInactiveTintColor: '#6B7280', // Gray color for inactive tabs
         headerShown: false, // Remove the top header/title bar
         tabBarButton: HapticTab,

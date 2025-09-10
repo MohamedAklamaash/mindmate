@@ -1,10 +1,198 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, memo } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, Alert, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useUserStore } from '@/store/userStore';
+import { useThemeStore, Theme, getThemeColors } from '@/store/themeStore';
 import { updateTherapistDescription, getTherapistData, getUserAllBookedSessions } from '@/services/firebaseService';
+
+type SidebarProps = {
+  isOpen: boolean;
+  sidebarAnimation: Animated.Value;
+  closeSidebar: () => void;
+  user: any;
+  selectedTheme: Theme;
+  setSelectedTheme: (theme: Theme) => void;
+  isThemeDropdownOpen: boolean;
+  setIsThemeDropdownOpen: (open: boolean) => void;
+};
+
+const Sidebar = memo(function Sidebar({
+  isOpen,
+  sidebarAnimation,
+  closeSidebar,
+  user,
+  selectedTheme,
+  setSelectedTheme,
+  isThemeDropdownOpen,
+  setIsThemeDropdownOpen,
+}: SidebarProps) {
+  const themes: Theme[] = ['system', 'light', 'dark', 'forest', 'retro', 'ocean', 'blossom'];
+
+  return (
+    <Modal
+      transparent={true}
+      visible={isOpen}
+      animationType="none"
+      onRequestClose={closeSidebar}
+      hardwareAccelerated={true}
+      statusBarTranslucent={true}
+    >
+      <View style={styles.sidebarOverlay} pointerEvents="box-none">
+        <Pressable style={styles.sidebarBackdrop} onPress={closeSidebar} />
+        <Animated.View 
+          style={[
+            styles.sidebarContainer,
+            {
+              transform: [{ translateX: sidebarAnimation }]
+            }
+          ]}
+        >
+          <ScrollView 
+            style={styles.sidebarContent} 
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={false}
+          >
+            {/* Profile Header */}
+            <View style={styles.profileHeader}>
+              <View style={styles.profileImageContainer}>
+                <LinearGradient colors={['#60A5FA', '#A78BFA']} style={styles.profileImage}>
+                  <MaterialCommunityIcons name="account" size={32} color="white" />
+                </LinearGradient>
+              </View>
+              <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+              <Text style={styles.memberSince}>Member since Aug 2024</Text>
+            </View>
+
+            {/* Settings Section */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionHeader}>Settings</Text>
+              
+              {/* Theme Setting */}
+              <View style={styles.themeSettingContainer}>
+                <View style={styles.settingItem}>
+                  <Text style={styles.settingLabel}>Theme</Text>
+                  <Pressable 
+                    style={styles.settingValue}
+                    onPress={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                  >
+                    <Text style={styles.settingValueText}>
+                    {selectedTheme.charAt(0).toUpperCase() + selectedTheme.slice(1)}
+                  </Text>
+                    <MaterialCommunityIcons 
+                      name={isThemeDropdownOpen ? "chevron-up" : "chevron-down"} 
+                      size={16} 
+                      color="#6B7280" 
+                    />
+                  </Pressable>
+                </View>
+
+                {/* Theme Options - Absolute positioned overlay */}
+                {isThemeDropdownOpen && (
+                  <View style={styles.themeOptionsContainer}>
+                    {themes.map((theme, index) => (
+                      <Pressable 
+                        key={theme} 
+                        style={[
+                          styles.themeOptionInline,
+                          index === themes.length - 1 && { borderBottomWidth: 0 }
+                        ]}
+                        onPress={() => {
+                          setSelectedTheme(theme);
+                          setIsThemeDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={styles.themeOptionTextInline}>
+                        {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                      </Text>
+                        {selectedTheme === theme && (
+                          <MaterialCommunityIcons name="check" size={16} color="#4F46E5" />
+                        )}
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Location Services */}
+              <View style={styles.settingItem}>
+                <View style={styles.settingWithIcon}>
+                  <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
+                  <Text style={styles.settingLabel}>Location Services</Text>
+                </View>
+                <View style={styles.toggleContainer}>
+                  <View style={styles.toggleSwitch}>
+                    <View style={styles.toggleThumb} />
+                  </View>
+                </View>
+              </View>
+
+              {/* Sleep Schedule */}
+              <View style={styles.settingItem}>
+                <View style={styles.settingWithIcon}>
+                  <MaterialCommunityIcons name="sleep" size={16} color="#6B7280" />
+                  <Text style={styles.settingLabel}>Sleep Schedule</Text>
+                </View>
+              </View>
+
+              {/* Sleep Time Settings */}
+              <View style={styles.sleepTimeContainer}>
+                <View style={styles.sleepTimeItem}>
+                  <Text style={styles.sleepTimeLabel}>Bedtime</Text>
+                  <Text style={styles.sleepTimeValue}>10:30 PM</Text>
+                </View>
+                <View style={styles.sleepTimeItem}>
+                  <Text style={styles.sleepTimeLabel}>Wake Time</Text>
+                  <Text style={styles.sleepTimeValue}>07:00 AM</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Profile Details Section */}
+            <View style={styles.profileDetailsSection}>
+              <Text style={styles.sectionHeader}>Profile Details</Text>
+              
+              {/* Username */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Username</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputValue}>{user?.name || 'v'}</Text>
+                </View>
+              </View>
+
+              {/* Email */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputPlaceholder}>Enter email</Text>
+                </View>
+              </View>
+
+              <Text style={styles.memberSinceDetail}>Member since Aug 2024</Text>
+            </View>
+
+            {/* Menu Items */}
+            <View style={styles.menuSection}>
+              <Pressable style={styles.menuItem} onPress={closeSidebar}>
+                <MaterialCommunityIcons name="book-open-variant" size={20} color="#6B7280" />
+                <Text style={styles.menuText}>My Courses</Text>
+              </Pressable>
+
+              <Pressable style={[styles.menuItem, styles.signOutItem]} onPress={() => {
+                closeSidebar();
+                Alert.alert('Sign Out', 'Are you sure you want to sign out?');
+              }}>
+                <MaterialCommunityIcons name="logout" size={20} color="#EF4444" />
+                <Text style={[styles.menuText, styles.signOutText]}>Sign Out</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+});
 
 export default function HomeScreen() {
   const user = useUserStore((state) => state.user);
@@ -153,6 +341,110 @@ export default function HomeScreen() {
     return ((totalPoints - previousLevelMax) / (currentLevel.max - previousLevelMax)) * 100;
   };
 
+  const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+  const selectedTheme = useThemeStore((state) => state.selectedTheme);
+  const setSelectedTheme = useThemeStore((state) => state.setSelectedTheme);
+  const themes: Theme[] = ['system', 'light', 'dark', 'forest', 'retro', 'ocean', 'blossom'];
+  
+  // Get theme colors for styling
+  const themeColors = getThemeColors(selectedTheme);
+
+  // Dynamic gradient based on theme
+  const getBackgroundGradient = (): [string, string, string] => {
+    switch (selectedTheme) {
+      case 'forest':
+        return ['#F0FDF4', '#ECFDF5', '#D1FAE5']; // Green gradient
+      case 'ocean':
+        return ['#EBF8FF', '#DBEAFE', '#BFDBFE']; // Blue gradient
+      case 'retro':
+        return ['#FEF3C7', '#FDE68A', '#F59E0B']; // Orange gradient
+      case 'blossom':
+        return ['#FDF2F8', '#FCE7F3', '#F9A8D4']; // Pink gradient
+      case 'dark':
+        return ['#1F2937', '#374151', '#4B5563']; // Dark gradient
+      case 'light':
+        return ['#F9FAFB', '#F3F4F6', '#E5E7EB']; // Light gradient
+      default:
+        return ['#EBF4FF', '#F3E8FF', '#FDF2F8']; // Default gradient
+    }
+  };
+
+  // Dynamic icon colors based on theme
+  const getIconGradient = (): [string, string] => {
+    switch (selectedTheme) {
+      case 'forest':
+        return ['#059669', '#10B981']; // Emerald to green
+      case 'ocean':
+        return ['#0891B2', '#3B82F6']; // Cyan to blue
+      case 'retro':
+        return ['#EA580C', '#F59E0B']; // Orange to amber
+      case 'blossom':
+        return ['#DB2777', '#F43F5E']; // Pink to rose
+      case 'dark':
+        return ['#3B82F6', '#8B5CF6']; // Blue to purple
+      case 'light':
+        return ['#60A5FA', '#A78BFA']; // Light blue to purple
+      default:
+        return ['#60A5FA', '#A78BFA']; // Default
+    }
+  };
+
+  // Dynamic level icon gradient
+  const getLevelIconGradient = (): [string, string] => {
+    switch (selectedTheme) {
+      case 'forest':
+        return ['#16A34A', '#059669']; // Green to emerald
+      case 'ocean':
+        return ['#0891B2', '#0E7490']; // Cyan variations
+      case 'retro':
+        return ['#F59E0B', '#D97706']; // Amber variations
+      case 'blossom':
+        return ['#A855F7', '#EC4899']; // Purple to pink
+      case 'dark':
+        return ['#A855F7', '#EC4899']; // Purple to pink
+      case 'light':
+        return ['#A855F7', '#EC4899']; // Purple to pink
+      default:
+        return ['#A855F7', '#EC4899']; // Default
+    }
+  };
+
+  // Dynamic badge gradients based on theme
+  const getBadgeGradients = (): { early: [string, string]; mood: [string, string]; sleep: [string, string] } => {
+    switch (selectedTheme) {
+      case 'forest':
+        return {
+          early: ['#059669', '#10B981'], // Emerald to green
+          mood: ['#16A34A', '#15803D'], // Green variations
+          sleep: ['#84CC16', '#65A30D'], // Lime variations
+        };
+      case 'ocean':
+        return {
+          early: ['#0891B2', '#06B6D4'], // Cyan variations
+          mood: ['#3B82F6', '#2563EB'], // Blue variations
+          sleep: ['#0D9488', '#14B8A6'], // Teal variations
+        };
+      case 'retro':
+        return {
+          early: ['#F59E0B', '#D97706'], // Amber variations
+          mood: ['#EA580C', '#DC2626'], // Orange to red
+          sleep: ['#FACC15', '#EAB308'], // Yellow variations
+        };
+      case 'blossom':
+        return {
+          early: ['#F43F5E', '#E11D48'], // Rose variations
+          mood: ['#DB2777', '#BE185D'], // Pink variations
+          sleep: ['#A855F7', '#9333EA'], // Purple variations
+        };
+      default:
+        return {
+          early: ['#FCD34D', '#F59E0B'], // Default yellow
+          mood: ['#F472B6', '#EF4444'], // Default pink to red
+          sleep: ['#34D399', '#3B82F6'], // Default green to blue
+        };
+    }
+  };
+
   // Sidebar animation functions
   const openSidebar = () => {
     setIsSidebarOpen(true);
@@ -172,130 +464,6 @@ export default function HomeScreen() {
       setIsSidebarOpen(false);
     });
   };
-
-  // Sidebar Component
-  const Sidebar = () => (
-    <Modal
-      transparent={true}
-      visible={isSidebarOpen}
-      animationType="none"
-      onRequestClose={closeSidebar}
-    >
-      <View style={styles.sidebarOverlay}>
-        <Pressable style={styles.sidebarBackdrop} onPress={closeSidebar} />
-        <Animated.View 
-          style={[
-            styles.sidebarContainer,
-            {
-              transform: [{ translateX: sidebarAnimation }]
-            }
-          ]}
-        >
-          <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
-            {/* Profile Header */}
-            <View style={styles.profileHeader}>
-              <View style={styles.profileImageContainer}>
-                <LinearGradient colors={['#60A5FA', '#A78BFA']} style={styles.profileImage}>
-                  <MaterialCommunityIcons name="account" size={32} color="white" />
-                </LinearGradient>
-                <Pressable style={styles.addButton}>
-                  <MaterialCommunityIcons name="plus" size={12} color="white" />
-                </Pressable>
-              </View>
-              <Text style={styles.profileName}>{user?.name || 'Welcome!'}</Text>
-              <Text style={styles.memberSince}>Member since Aug 2024</Text>
-            </View>
-
-            {/* Gamification Section */}
-            <View style={styles.gamificationCard}>
-              <View style={styles.levelSection}>
-                <LinearGradient colors={['#A855F7', '#EC4899']} style={styles.levelIcon}>
-                  <MaterialCommunityIcons name="trophy" size={24} color="white" />
-                </LinearGradient>
-                <Text style={styles.levelTitle}>Level {getCurrentLevel().level}: {getCurrentLevel().name}</Text>
-                <Text style={styles.totalPoints}>1250 total points</Text>
-              </View>
-
-              <View style={styles.progressSection}>
-                <View style={styles.progressLabels}>
-                  <Text style={styles.progressLabel}>Level {getCurrentLevel().level}</Text>
-                  <Text style={styles.progressLabel}>Level {getCurrentLevel().level + 1}</Text>
-                </View>
-                <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${getProgressToNextLevel()}%` }]} />
-                </View>
-                <Text style={styles.pointsToNext}>
-                  {getCurrentLevel().max - 1250} points to next level
-                </Text>
-              </View>
-
-              {/* Rewards Section */}
-              <View style={styles.rewardsSection}>
-                <View style={styles.rewardsHeader}>
-                  <Text style={styles.rewardsTitle}>Next Reward</Text>
-                  <MaterialCommunityIcons name="gift" size={16} color="#A855F7" />
-                </View>
-                <View style={styles.rewardProgress}>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${(1250 % 100)}%` }]} />
-                  </View>
-                  <Text style={styles.pointsToReward}>
-                    {100 - (1250 % 100)} points until free session voucher
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Achievements */}
-            <View style={styles.achievementsCard}>
-              <Text style={styles.achievementsTitle}>Recent Badges</Text>
-              <View style={styles.badgesGrid}>
-                <View style={styles.badgeItem}>
-                  <LinearGradient colors={['#FCD34D', '#F59E0B']} style={styles.badgeIcon}>
-                    <MaterialCommunityIcons name="white-balance-sunny" size={20} color="white" />
-                  </LinearGradient>
-                  <Text style={styles.badgeText}>Early Bird</Text>
-                </View>
-                <View style={styles.badgeItem}>
-                  <LinearGradient colors={['#F472B6', '#EF4444']} style={styles.badgeIcon}>
-                    <MaterialCommunityIcons name="heart" size={20} color="white" />
-                  </LinearGradient>
-                  <Text style={styles.badgeText}>Mood Tracker</Text>
-                </View>
-                <View style={styles.badgeItem}>
-                  <LinearGradient colors={['#34D399', '#3B82F6']} style={styles.badgeIcon}>
-                    <MaterialCommunityIcons name="moon-waning-crescent" size={20} color="white" />
-                  </LinearGradient>
-                  <Text style={styles.badgeText}>Sleep Champion</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Menu Items */}
-            <View style={styles.menuSection}>
-              <Pressable style={styles.menuItem} onPress={closeSidebar}>
-                <MaterialCommunityIcons name="cog" size={20} color="#6B7280" />
-                <Text style={styles.menuText}>Settings</Text>
-              </Pressable>
-              
-              <Pressable style={styles.menuItem} onPress={closeSidebar}>
-                <MaterialCommunityIcons name="book-open-variant" size={20} color="#6B7280" />
-                <Text style={styles.menuText}>My Courses</Text>
-              </Pressable>
-
-              <Pressable style={[styles.menuItem, styles.signOutItem]} onPress={() => {
-                closeSidebar();
-                Alert.alert('Sign Out', 'Are you sure you want to sign out?');
-              }}>
-                <MaterialCommunityIcons name="logout" size={20} color="#EF4444" />
-                <Text style={[styles.menuText, styles.signOutText]}>Sign Out</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
 
   const formatTime = (timeString: string) => {
     try {
@@ -372,8 +540,11 @@ export default function HomeScreen() {
 
   // Render therapist home screen with description input
   if (userType === 'therapist') {
+    const gradientColors = getBackgroundGradient();
+    const iconGradientColors = getIconGradient();
+    
     return (
-      <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+      <LinearGradient colors={gradientColors} style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
             <ScrollView 
@@ -384,18 +555,18 @@ export default function HomeScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.headerSection}>
-                <LinearGradient colors={['#60A5FA', '#A78BFA']} style={styles.iconContainer}>
+                <LinearGradient colors={iconGradientColors} style={styles.iconContainer}>
                   <MaterialCommunityIcons name="account-tie" size={40} color="white" />
                 </LinearGradient>
-                <Text style={styles.welcomeText}>
+                <Text style={[styles.welcomeText, { color: themeColors.text }]}>
                   {getTimeBasedGreeting()} {user?.name || 'Therapist'}!
                 </Text>
-                <Text style={styles.subtitle}>Professional Dashboard</Text>
+                <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>Professional Dashboard</Text>
               </View>
 
-              <View style={styles.descriptionSection}>
+              <View style={[styles.descriptionSection, { backgroundColor: themeColors.surface }]}>
                 <View style={styles.descriptionHeader}>
-                  <Text style={styles.sectionTitle}>Professional Description</Text>
+                  <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Professional Description</Text>
                   {!isEditing && (
                     <Pressable onPress={() => setIsEditing(true)} style={styles.editButton}>
                       <MaterialCommunityIcons name="pencil" size={20} color="#4F46E5" />
@@ -452,8 +623,12 @@ export default function HomeScreen() {
   }
 
   // Render user home screen (existing design)
+  const gradientColors = getBackgroundGradient();
+  const iconGradientColors = getIconGradient();
+  const levelIconGradientColors = getLevelIconGradient();
+  
   return (
-    <LinearGradient colors={['#EBF4FF', '#F3E8FF', '#FDF2F8']} style={styles.container}>
+    <LinearGradient colors={gradientColors} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView 
           style={styles.scrollView}
@@ -463,102 +638,154 @@ export default function HomeScreen() {
         >
           <View style={styles.headerSection}>
             <Pressable 
-              style={styles.sidebarToggle}
+              style={[styles.sidebarToggle, { backgroundColor: themeColors.surface }]}
               onPress={openSidebar}
             >
-              <MaterialCommunityIcons name="menu" size={24} color="#4F46E5" />
+              <MaterialCommunityIcons name="menu" size={24} color={themeColors.primary} />
             </Pressable>
-            <LinearGradient colors={['#60A5FA', '#A78BFA']} style={styles.iconContainer}>
+            <LinearGradient colors={iconGradientColors} style={styles.iconContainer}>
               <MaterialCommunityIcons name="account-heart" size={40} color="white" />
             </LinearGradient>
-            <Text style={styles.welcomeText}>
+            <Text style={[styles.welcomeText, { color: themeColors.text }]}>
               {getTimeBasedGreeting()} {user?.name || 'User'}!
             </Text>
-            <Text style={styles.subtitle}>Your Mental Health Journey</Text>
+            <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>Your Mental Health Journey</Text>
           </View>
 
-          {/* Upcoming Session Card */}
+          {/* Gamification Section - moved to top */}
+          <View style={styles.gamificationSection}>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Your Progress</Text>
+            <View style={[styles.gamificationCard, { backgroundColor: themeColors.surface }]}>
+              <View style={styles.levelSection}>
+                <LinearGradient colors={levelIconGradientColors} style={styles.levelIcon}>
+                  <MaterialCommunityIcons name="trophy" size={24} color="white" />
+                </LinearGradient>
+                <View style={styles.levelInfo}>
+                  <Text style={[styles.levelTitle, { color: themeColors.text }]}>Level {getCurrentLevel().level}: {getCurrentLevel().name}</Text>
+                  <Text style={[styles.totalPoints, { color: themeColors.textSecondary }]}>1250 total points</Text>
+                </View>
+              </View>
+
+              <View style={styles.progressSection}>
+                <View style={styles.progressLabels}>
+                  <Text style={[styles.progressLabel, { color: themeColors.textSecondary }]}>Level {getCurrentLevel().level}</Text>
+                  <Text style={[styles.progressLabel, { color: themeColors.textSecondary }]}>Level {getCurrentLevel().level + 1}</Text>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: themeColors.border }]}>
+                  <View style={[styles.progressFill, { width: `${getProgressToNextLevel()}%`, backgroundColor: themeColors.accent }]} />
+                </View>
+                <Text style={[styles.pointsToNext, { color: themeColors.textSecondary }]}>
+                  {getCurrentLevel().max - 1250} points to next level
+                </Text>
+              </View>
+
+              {/* Rewards Section */}
+              <View style={styles.rewardsSection}>
+                <View style={styles.rewardsHeader}>
+                  <Text style={styles.rewardsTitle}>Next Reward</Text>
+                  <MaterialCommunityIcons name="gift" size={16} color="#A855F7" />
+                </View>
+                <View style={styles.rewardProgress}>
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${(1250 % 100)}%` }]} />
+                  </View>
+                  <Text style={styles.pointsToReward}>
+                    {100 - (1250 % 100)} points until free session voucher
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Achievements - moved here */}
+            <View style={[styles.achievementsCard, { backgroundColor: themeColors.surface }]}>
+              <Text style={[styles.achievementsTitle, { color: themeColors.text }]}>Recent Badges</Text>
+              <View style={styles.badgesGrid}>
+                <View style={styles.badgeItem}>
+                  <LinearGradient colors={getBadgeGradients().early} style={styles.badgeIcon}>
+                    <MaterialCommunityIcons name="white-balance-sunny" size={20} color="white" />
+                  </LinearGradient>
+                  <Text style={[styles.badgeText, { color: themeColors.textSecondary }]}>Early Bird</Text>
+                </View>
+                <View style={styles.badgeItem}>
+                  <LinearGradient colors={getBadgeGradients().mood} style={styles.badgeIcon}>
+                    <MaterialCommunityIcons name="heart" size={20} color="white" />
+                  </LinearGradient>
+                  <Text style={[styles.badgeText, { color: themeColors.textSecondary }]}>Mood Tracker</Text>
+                </View>
+                <View style={styles.badgeItem}>
+                  <LinearGradient colors={getBadgeGradients().sleep} style={styles.badgeIcon}>
+                    <MaterialCommunityIcons name="moon-waning-crescent" size={20} color="white" />
+                  </LinearGradient>
+                  <Text style={[styles.badgeText, { color: themeColors.textSecondary }]}>Sleep Champion</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Upcoming Session Card - moved to bottom */}
           <View style={styles.sessionSection}>
-            <Text style={styles.sectionTitle}>Upcoming Session</Text>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Upcoming Session</Text>
             
             {loadingSession ? (
-              <View style={styles.sessionCard}>
-                <ActivityIndicator size="small" color="#4F46E5" />
-                <Text style={styles.loadingText}>Loading session...</Text>
+              <View style={[styles.sessionCard, { backgroundColor: themeColors.surface }]}>
+                <ActivityIndicator size="small" color={themeColors.primary} />
+                <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>Loading session...</Text>
               </View>
             ) : upcomingSession ? (
-              <View style={styles.sessionCard}>
+              <View style={[styles.sessionCard, { backgroundColor: themeColors.surface }]}>
                 <View style={styles.sessionHeader}>
-                  <View style={styles.sessionIconContainer}>
-                    <MaterialCommunityIcons name="calendar-check" size={24} color="#4F46E5" />
+                  <View style={[styles.sessionIconContainer, { backgroundColor: themeColors.background }]}>
+                    <MaterialCommunityIcons name="calendar-check" size={24} color={themeColors.primary} />
                   </View>
                   <View style={styles.sessionInfo}>
-                    <Text style={styles.therapistName}>{upcomingSession.therapistName}</Text>
-                    <Text style={styles.sessionType}>{upcomingSession.fieldType}</Text>
+                    <Text style={[styles.therapistName, { color: themeColors.text }]}>{upcomingSession.therapistName}</Text>
+                    <Text style={[styles.sessionType, { color: themeColors.textSecondary }]}>{upcomingSession.fieldType}</Text>
                   </View>
                 </View>
                 
                 <View style={styles.sessionDetails}>
                   <View style={styles.sessionDetailRow}>
-                    <MaterialCommunityIcons name="calendar" size={16} color="#6B7280" />
-                    <Text style={styles.sessionDetailText}>{formatDate(upcomingSession.date)}</Text>
+                    <MaterialCommunityIcons name="calendar" size={16} color={themeColors.textSecondary} />
+                    <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>{formatDate(upcomingSession.date)}</Text>
                   </View>
                   <View style={styles.sessionDetailRow}>
-                    <MaterialCommunityIcons name="clock" size={16} color="#6B7280" />
-                    <Text style={styles.sessionDetailText}>
+                    <MaterialCommunityIcons name="clock" size={16} color={themeColors.textSecondary} />
+                    <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>
                       {formatTime(upcomingSession.startTime)} • {formatDuration(upcomingSession.duration)}
                     </Text>
                   </View>
                   <View style={styles.sessionDetailRow}>
-                    <MaterialCommunityIcons name="currency-usd" size={16} color="#6B7280" />
-                    <Text style={styles.sessionDetailText}>${upcomingSession.price}</Text>
+                    <MaterialCommunityIcons name="currency-usd" size={16} color={themeColors.textSecondary} />
+                    <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>${upcomingSession.price}</Text>
                   </View>
                 </View>
 
-                <Pressable style={styles.sessionButton}>
+                <Pressable style={[styles.sessionButton, { backgroundColor: themeColors.primary }]}>
                   <MaterialCommunityIcons name="video" size={16} color="white" />
                   <Text style={styles.sessionButtonText}>Join Session</Text>
                 </Pressable>
               </View>
             ) : (
-              <View style={styles.noSessionCard}>
-                <MaterialCommunityIcons name="calendar-plus" size={48} color="#9CA3AF" />
-                <Text style={styles.noSessionTitle}>No Upcoming Sessions</Text>
-                <Text style={styles.noSessionSubtitle}>
-                  Book a session with one of our qualified therapists to get started.
+              <View style={[styles.noSessionCard, { backgroundColor: themeColors.surface }]}>
+                <MaterialCommunityIcons name="calendar-plus" size={48} color={themeColors.textMuted} />
+                <Text style={[styles.noSessionTitle, { color: themeColors.text }]}>No Upcoming Sessions</Text>
+                <Text style={[styles.noSessionSubtitle, { color: themeColors.textSecondary }]}>
+                  Visit the Therapist tab to book a session with one of our qualified therapists.
                 </Text>
-                <Pressable style={styles.bookSessionButton}>
-                  <MaterialCommunityIcons name="account-search" size={16} color="#4F46E5" />
-                  <Text style={styles.bookSessionButtonText}>Find Therapists</Text>
-                </Pressable>
               </View>
             )}
           </View>
-
-          {/* Quick Actions */}
-          <View style={styles.actionsSection}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsGrid}>
-              <Pressable style={styles.actionCard}>
-                <MaterialCommunityIcons name="message-text" size={24} color="#4F46E5" />
-                <Text style={styles.actionText}>Chat</Text>
-              </Pressable>
-              <Pressable style={styles.actionCard}>
-                <MaterialCommunityIcons name="account-search" size={24} color="#4F46E5" />
-                <Text style={styles.actionText}>Find Therapist</Text>
-              </Pressable>
-              <Pressable style={styles.actionCard}>
-                <MaterialCommunityIcons name="calendar-multiple" size={24} color="#4F46E5" />
-                <Text style={styles.actionText}>My Sessions</Text>
-              </Pressable>
-              <Pressable style={styles.actionCard}>
-                <MaterialCommunityIcons name="book-open-variant" size={24} color="#4F46E5" />
-                <Text style={styles.actionText}>Resources</Text>
-              </Pressable>
-            </View>
-          </View>
         </ScrollView>
-        <Sidebar />
+        <Sidebar 
+          isOpen={isSidebarOpen}
+          sidebarAnimation={sidebarAnimation}
+          closeSidebar={closeSidebar}
+          user={user}
+          selectedTheme={selectedTheme}
+          setSelectedTheme={setSelectedTheme}
+          isThemeDropdownOpen={isThemeDropdownOpen}
+          setIsThemeDropdownOpen={setIsThemeDropdownOpen}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -748,39 +975,149 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // Quick Actions Styles
-  actionsSection: {
+  // Quick Actions Styles (now Gamification Section)
+  gamificationSection: {
     marginBottom: 20,
   },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  actionCard: {
+  
+  // Update existing gamificationCard to work in main section
+  gamificationCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '47%', // Use specific width instead of flex: 1
-    aspectRatio: 1, // Make cards square
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  actionText: {
+  levelSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  levelIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  levelInfo: {
+    flex: 1,
+  },
+  levelTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  totalPoints: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  progressSection: {
+    marginBottom: 16,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
     fontSize: 12,
+    color: '#6B7280',
     fontWeight: '500',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#8B5CF6',
+    borderRadius: 3,
+  },
+  pointsToNext: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  rewardsSection: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  rewardsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  rewardsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  rewardProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pointsToReward: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  achievementsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  achievementsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  badgesGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 12,
+  },
+  badgeItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  badgeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  badgeText: {
+    fontSize: 12,
     color: '#374151',
-    marginTop: 8,
     textAlign: 'center',
+    fontWeight: '500',
   },
   
   // Loading States
@@ -914,19 +1251,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButton: {
-    position: 'absolute',
-    bottom: -5,
-    right: -5,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
   profileName: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -937,61 +1261,153 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
-  gamificationCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  
+  // Settings Section Styles
+  settingsSection: {
+    marginBottom: 30,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  levelSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  levelIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  levelTitle: {
-    fontSize: 16,
+  sectionHeader: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
-    flex: 1,
+    marginBottom: 16,
   },
-  totalPoints: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  progressSection: {
-    marginTop: 8,
-  },
-  progressLabels: {
+  settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    paddingVertical: 12,
   },
-  progressLabel: {
-    fontSize: 12,
+  settingLabel: {
+    fontSize: 16,
+    color: '#374151',
+  },
+  settingValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  settingValueText: {
+    fontSize: 14,
     color: '#6B7280',
-    fontWeight: '500',
   },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
+  
+  // Theme Setting Container - Relative positioned for absolute dropdown
+  themeSettingContainer: {
+    position: 'relative',
+  },
+  
+  // Theme Options Container - Absolute positioned overlay
+  themeOptionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 16,
+    right: 8,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
     overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#8B5CF6',
-    borderRadius: 3,
+  themeOptionInline: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  themeOptionTextInline: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  settingWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleContainer: {
+    alignItems: 'flex-end',
+  },
+  toggleSwitch: {
+    width: 40,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    marginLeft: 16,
+  },
+  sleepTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginLeft: 24,
+  },
+  sleepTimeItem: {
+    alignItems: 'center',
+  },
+  sleepTimeLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  sleepTimeValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  
+  // Profile Details Section
+  profileDetailsSection: {
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+  },
+  inputContainer: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  inputValue: {
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  inputPlaceholder: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  memberSinceDetail: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 8,
   },
   streakContainer: {
     flexDirection: 'row',
@@ -1091,76 +1507,6 @@ const styles = StyleSheet.create({
   },
   menuChevron: {
     marginLeft: 8,
-  },
-  pointsToNext: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  rewardsSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  rewardsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  rewardsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  rewardProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  pointsToReward: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  achievementsCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  achievementsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
-  },
-  badgesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  badgeItem: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 70,
-  },
-  badgeIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  badgeText: {
-    fontSize: 10,
-    color: '#374151',
-    textAlign: 'center',
   },
   signOutItem: {
     marginTop: 8,

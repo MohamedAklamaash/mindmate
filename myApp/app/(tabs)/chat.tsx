@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
+import { useThemeStore, getThemeColors } from '@/store/themeStore';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
@@ -13,6 +14,50 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const router = useRouter();
+
+  // Theme support
+  const selectedTheme = useThemeStore((state) => state.selectedTheme);
+  const themeColors = getThemeColors(selectedTheme);
+
+  // Dynamic gradient based on theme
+  const getBackgroundColor = (): string => {
+    switch (selectedTheme) {
+      case 'forest':
+        return '#F0FDF4'; // Light green
+      case 'ocean':
+        return '#EBF8FF'; // Light blue
+      case 'retro':
+        return '#FEF3C7'; // Light orange
+      case 'blossom':
+        return '#FDF2F8'; // Light pink
+      case 'dark':
+        return '#1F2937'; // Dark gray
+      case 'light':
+        return '#F9FAFB'; // Light gray
+      default:
+        return '#f8f9fa'; // Default
+    }
+  };
+
+  // Dynamic accent color for buttons and icons
+  const getAccentColor = (): string => {
+    switch (selectedTheme) {
+      case 'forest':
+        return '#059669'; // Emerald
+      case 'ocean':
+        return '#0891B2'; // Cyan
+      case 'retro':
+        return '#EA580C'; // Orange
+      case 'blossom':
+        return '#DB2777'; // Pink
+      case 'dark':
+        return '#3B82F6'; // Blue
+      case 'light':
+        return '#007bff'; // Blue
+      default:
+        return '#007bff'; // Default blue
+    }
+  };
 
   // Audio visualization animations
   const animatedValues = useRef(
@@ -296,28 +341,24 @@ export default function ChatScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: getBackgroundColor() }]}>
       {/* Header with title and close button */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>WittyMate AI</Text>
-            <View style={styles.onlineBadge}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>Online</Text>
-            </View>
+            <Text style={[styles.headerTitle, { color: themeColors.text }]}>WittyMate AI</Text>
           </View>
           <TouchableOpacity 
             style={styles.closeButton}
             onPress={() => router.push('/')} // Navigate to home tab
           >
-            <Ionicons name="close" size={20} color="#666" />
+            <Ionicons name="close" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Chat messages container */}
-      <View style={styles.messagesWrapper}>
+      <View style={[styles.messagesWrapper, { backgroundColor: getBackgroundColor() }]}>
         <FlatList
           data={messages}
           keyExtractor={(_, index) => index.toString()}
@@ -328,12 +369,17 @@ export default function ChatScreen() {
             ]}>
               <View style={[
                 styles.message, 
-                item.role === "user" ? styles.userMessage : 
-                item.role === "system" ? styles.systemMessage : styles.botMessage
+                item.role === "user" 
+                  ? [styles.userMessage, { backgroundColor: getAccentColor() }]
+                  : item.role === "system" 
+                    ? [styles.systemMessage, { backgroundColor: themeColors.background, borderColor: themeColors.border }]
+                    : [styles.botMessage, { backgroundColor: themeColors.surface }]
               ]}>
                 <Text style={[
                   styles.messageText,
-                  item.role === "user" ? styles.userMessageText : styles.botMessageText
+                  item.role === "user" 
+                    ? styles.userMessageText 
+                    : [styles.botMessageText, { color: themeColors.text }]
                 ]}>{item.text}</Text>
               </View>
             </View>
@@ -344,22 +390,26 @@ export default function ChatScreen() {
       </View>
 
       {/* Fixed input at bottom */}
-      <View style={styles.inputWrapper}>
+      <View style={[styles.inputWrapper, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border }]}>
         <View style={styles.inputContainer}>
-          <View style={styles.inputBox}>
+          <View style={[styles.inputBox, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: themeColors.text }]}
               value={input}
               onChangeText={setInput}
               placeholder="How are you feeling today?"
-              placeholderTextColor="#999"
+              placeholderTextColor={themeColors.textMuted}
               editable={!isLoading}
               onSubmitEditing={sendMessage}
               returnKeyType="send"
               multiline={false}
             />
             <TouchableOpacity 
-              style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]} 
+              style={[
+                styles.sendButton, 
+                { backgroundColor: getAccentColor() },
+                (!input.trim() || isLoading) && [styles.sendButtonDisabled, { backgroundColor: themeColors.textMuted }]
+              ]} 
               onPress={sendMessage}
               disabled={isLoading || !input.trim()}
             >
@@ -373,7 +423,7 @@ export default function ChatScreen() {
           
           {/* Voice and Reset buttons */}
           <TouchableOpacity 
-            style={[styles.actionButton, styles.voiceButton]} 
+            style={[styles.actionButton, styles.voiceButton, { backgroundColor: getAccentColor(), borderColor: getAccentColor() }]} 
             onPress={handleMicPress}
           >
             <Ionicons 
@@ -384,13 +434,13 @@ export default function ChatScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.actionButton, styles.resetButton]}
+            style={[styles.actionButton, styles.resetButton, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
             onPress={() => {
               setMessages([]);
               setInput("");
             }}
           >
-            <Ionicons name="refresh" size={20} color="#666" />
+            <Ionicons name="refresh" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -398,17 +448,17 @@ export default function ChatScreen() {
       {/* Audio Visualization Overlay */}
       {isRecording && (
         <View style={styles.audioOverlay}>
-          <View style={styles.audioVisualizerContainer}>
+          <View style={[styles.audioVisualizerContainer, { backgroundColor: themeColors.surface }]}>
             {/* Blue microphone icon */}
-            <View style={styles.micIconContainer}>
+            <View style={[styles.micIconContainer, { backgroundColor: getAccentColor() }]}>
               <Ionicons name="mic" size={32} color="#fff" />
             </View>
             
             {/* Listening text */}
-            <Text style={styles.listeningText}>Listening...</Text>
+            <Text style={[styles.listeningText, { color: themeColors.text }]}>Listening...</Text>
             
             {/* Subtitle */}
-            <Text style={styles.listeningSubtext}>Speak now, I'm listening</Text>
+            <Text style={[styles.listeningSubtext, { color: themeColors.textSecondary }]}>Speak now, I'm listening</Text>
             
             {/* Animated dots */}
             <View style={styles.dotsContainer}>
@@ -417,6 +467,7 @@ export default function ChatScreen() {
                   key={index}
                   style={[
                     styles.dot,
+                    { backgroundColor: getAccentColor() },
                     {
                       opacity: animatedValues[index].interpolate({
                         inputRange: [0, 1],
@@ -430,10 +481,10 @@ export default function ChatScreen() {
             
             {/* Cancel Button */}
             <TouchableOpacity 
-              style={styles.cancelButton} 
+              style={[styles.cancelButton, { backgroundColor: themeColors.background, borderColor: themeColors.border }]} 
               onPress={handleMicPress}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={[styles.cancelButtonText, { color: themeColors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -444,16 +495,13 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { 
-    flex: 1, 
-    backgroundColor: "#f8f9fa",
+    flex: 1,
     //paddingTop: Platform.OS === 'android' ? 25 : 0, // Add spacing from status bar on Android
   },
   
   // Header styles
   header: {
-    backgroundColor: "white",
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
     paddingHorizontal: 10,
     paddingVertical: 20,
     },
@@ -469,13 +517,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212529",
     marginBottom: 10,
   },
   onlineBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#d4edda",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -485,12 +531,10 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#28a745",
     marginRight: 4,
   },
   onlineText: {
     fontSize: 12,
-    color: "#155724",
     fontWeight: "500",
   },
   closeButton: {
@@ -505,7 +549,6 @@ const styles = StyleSheet.create({
   // Messages styles
   messagesWrapper: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
     marginBottom: 80, // Add margin to prevent overlap with input
   },
   messagesContainer: { 
@@ -533,16 +576,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   userMessage: { 
-    backgroundColor: "#007bff",
     borderBottomRightRadius: 6,
   },
   botMessage: { 
-    backgroundColor: "white",
     borderBottomLeftRadius: 6,
   },
   systemMessage: { 
-    backgroundColor: "#fff3cd",
-    borderColor: "#ffeaa7",
     borderWidth: 1,
     alignSelf: "center",
   },
@@ -554,15 +593,13 @@ const styles = StyleSheet.create({
     color: "white",
   },
   botMessageText: {
-    color: "#212529",
+    // Color now set dynamically
   },
   
   // Input styles
   inputWrapper: {
     height: 100,
-    backgroundColor: "white",
     borderTopWidth: 1,
-    borderTopColor: "#e9ecef",
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingBottom: Platform.OS === 'ios' ? 34 : 12,
@@ -577,9 +614,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
     borderWidth: 1,
-    borderColor: "#dee2e6",
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -592,12 +627,10 @@ const styles = StyleSheet.create({
   input: { 
     flex: 1, 
     fontSize: 16,
-    color: "#212529",
     paddingVertical: 8,
     maxHeight: 100,
   },
   sendButton: {
-    backgroundColor: "#007bff",
     borderRadius: 18,
     width: 36,
     height: 36,
@@ -606,7 +639,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: "#6c757d",
+    // Background color now set dynamically
   },
   actionButton: {
     width: 40,
@@ -623,12 +656,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   voiceButton: {
-    backgroundColor: "#8b5cf6",
-    borderColor: "#8b5cf6",
+    // Colors now set dynamically
   },
   resetButton: {
-    backgroundColor: "white",
-    borderColor: "#dee2e6",
+    // Colors now set dynamically
   },
   
   // Audio overlay styles
@@ -645,7 +676,6 @@ const styles = StyleSheet.create({
   },
   audioVisualizerContainer: {
     alignItems: "center",
-    backgroundColor: "#fff",
     padding: 40,
     borderRadius: 20,
     minWidth: 280,
@@ -662,12 +692,11 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#4285F4",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
     elevation: 4,
-    shadowColor: "#4285F4",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -678,12 +707,10 @@ const styles = StyleSheet.create({
   listeningText: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 8,
   },
   listeningSubtext: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     marginBottom: 32,
   },
@@ -698,19 +725,15 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#4285F4",
   },
   cancelButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: "#f8f9fa",
     borderWidth: 1,
-    borderColor: "#dee2e6",
   },
   cancelButtonText: {
     fontSize: 16,
-    color: "#495057",
     fontWeight: "500",
   },
 });
