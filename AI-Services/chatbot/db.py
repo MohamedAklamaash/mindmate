@@ -5,149 +5,214 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 from typing import Dict, Any, List, Optional
+from structures import PersonalSummary, ConversationInsights
+import yaml
+from datetime import datetime
 
-class FireBaseDB:
-    def __init__(self, config_file_path: str):
-        self.config_file_path = config_file_path
-        self.local_db_path = os.path.join('.cache', 'local_db.sqlite')
-        self.cache_dir = '.cache'
-        self.db = None
-        self.local_conn = None
-        self._initialize_firebase()
-        self._setup_local_db()
-    
-    def _initialize_firebase(self):
-        if not firebase_admin._apps:
-            cred = credentials.Certificate(self.config_file_path)
-            firebase_admin.initialize_app(cred)
-        self.db = firestore.client()
-    
-    def _setup_local_db(self):
-        os.makedirs(self.cache_dir, exist_ok=True)
-        self.local_conn = sqlite3.connect(self.local_db_path)
-        cursor = self.local_conn.cursor()
-        
+class LocalDB:
+    def __init__(self, config_path: str):
+        """
+        Initialize LocalDB with config file path.
+        Uses local_db_path from config.yaml.
+        Ensures the directory for the database exists.
+        """
+        self.config_path = config_path
+
+        # Load config and get local_db_path
+        with open(self.config_path, "r") as f:
+            config = yaml.safe_load(f)
+        self.local_db_path = config.get("local_db_path", ".cache/local_db.sqlite")
+
+        # Ensure the directory for the database exists
+        db_dir = os.path.dirname(self.local_db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+
+        # Connect to SQLite database
+        self.conn = sqlite3.connect(self.local_db_path)
+        self._setup_tables()
+
+    def _setup_tables(self):
+        cursor = self.conn.cursor()
+        # Table for summaries (single table, no distinction between personal/final)
         cursor.execute('''
-        CREATE TABLE IF NOT EXISTS conversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id TEXT UNIQUE,
-            user_id TEXT,
-            message TEXT,
-            response TEXT,
-            date TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            synced BOOLEAN DEFAULT 0
-        )
+            CREATE TABLE IF NOT EXISTS summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                summary TEXT,
+                insights TEXT,
+                timestamp TEXT
+            )
         ''')
-        
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT UNIQUE,
-            data TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            synced BOOLEAN DEFAULT 0
+        self.conn.commit()
+
+    def insert_summary(self, input: PersonalSummary):
+        """
+        Insert a record into `summaries` using an input that follows the
+        `PersonalSummary` structure (has fields `summary` and `insights`).
+
+        - Adds a `timestamp` field (ISO string)
+        - Persists into columns: (summary TEXT, insights TEXT, timestamp TEXT)
+        - Returns True if successful, False otherwise
+        """
+        try:
+            timestamp_value = datetime.now().isoformat()
+            # input is guaranteed to be PersonalSummary
+            if hasattr(input, "model_dump") and callable(getattr(input, "model_dump")):
+                payload = input.model_dump()
+            else:
+                payload = input.dict()
+            cursor = self.conn.cursor()
+            cursor.execute(
+                '''
+                INSERT INTO summaries (summary, insights, timestamp)
+                VALUES (?, ?, ?)
+                ''',
+                (payload["summary"], json.dumps(payload.get("insights", {})), timestamp_value)
+            )
+            self.conn.commit()
+            return True
+        except Exception:
+            return False
+
+    def get_summaries_last_n_days(self, days: int) -> List[PersonalSummary]:
+        """
+        Return a list of PersonalSummary for the last `days` days excluding today.
+        Example: if today is Sep 5 and days=4, returns data from Sep 1 00:00
+        up to (but not including) Sep 5 00:00, ordered from oldest to newest.
+        """
+        from datetime import datetime, timedelta
+
+        # Calculate time window [start, end)
+        now = datetime.now()
+        start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_time = start_of_today - timedelta(days=days)
+        end_time = start_of_today
+
+        start_iso = start_time.isoformat()
+        end_iso = end_time.isoformat()
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            SELECT summary, insights, timestamp
+            FROM summaries
+            WHERE timestamp >= ? AND timestamp < ?
+            ORDER BY timestamp ASC
+            ''',
+            (start_iso, end_iso)
         )
-        ''')
-        
-        self.local_conn.commit()
+        rows = cursor.fetchall()
+
+        results: List[PersonalSummary] = []
+        for summary_text, insights_text, _ts in rows:
+            try:
+                insights_payload = json.loads(insights_text) if insights_text else {}
+                # Build ConversationInsights safely; allow partial dicts
+                insights_model = ConversationInsights(**insights_payload) if isinstance(insights_payload, dict) else ConversationInsights()
+            except Exception:
+                insights_model = ConversationInsights()
+            results.append(PersonalSummary(summary=summary_text or "", insights=insights_model))
+
+        return results
     
-    def clear_cache_directory(self):
-        if os.path.exists(self.cache_dir):
-            shutil.rmtree(self.cache_dir)
-            os.makedirs(self.cache_dir)
-            self._setup_local_db()
+    def delete_summaries_last_n_days(self, days: int) -> int:
+        """
+        Delete summaries from the last `days` days excluding today.
+        Returns the number of rows deleted.
+        """
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_time = start_of_today - timedelta(days=days)
+        end_time = start_of_today
+
+        start_iso = start_time.isoformat()
+        end_iso = end_time.isoformat()
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            DELETE FROM summaries
+            WHERE timestamp >= ? AND timestamp < ?
+            ''',
+            (start_iso, end_iso)
+        )
+        deleted_count = cursor.rowcount
+        self.conn.commit()
+        return deleted_count
+
+    def delete_summaries_in_range(self, start_date: str, end_date: str) -> int:
+        """
+        Delete summaries between start_date and end_date (inclusive of the end day).
+        Input format: 'dd-mm-YYYY' (e.g., '01-09-2025').
+        The function converts these to ISO timestamps at 00:00:00 and deletes in the
+        range [start_date 00:00, (end_date + 1 day) 00:00).
+        Returns the number of rows deleted.
+        """
+        from datetime import datetime, timedelta
+
+        # Parse dd-mm-YYYY and normalize to start-of-day ISO strings
+        start_dt = datetime.strptime(start_date, "%d-%m-%Y").replace(hour=0, minute=0, second=0, microsecond=0)
+        # end is inclusive day, so move to next day's start to make upper bound exclusive
+        end_dt = datetime.strptime(end_date, "%d-%m-%Y").replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+        start_iso = start_dt.isoformat()
+        end_iso = end_dt.isoformat()
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            DELETE FROM summaries
+            WHERE timestamp >= ? AND timestamp < ?
+            ''',
+            (start_iso, end_iso)
+        )
+        deleted_count = cursor.rowcount
+        self.conn.commit()
+        return deleted_count
+
+
+class CloudDB:
+
+
+
+
+
+class DB:
+    def __init__(self, config_path: str):
+        """
+        Orchestrator DB that wires both LocalDB and CloudDB. Takes a config path
+        and initializes the local database using it. CloudDB is kept as a stub
+        per current requirements.
+        """
+        self.config_path = config_path
+        self.local_db = LocalDB(config_path)
+        self.cloud_db = CloudDB()
+
+    def insert_local_summary(self, input: PersonalSummary) -> bool:
+        return self.local_db.insert_summary(input)
+
+    def insert_cloud_summary(self, input: PersonalSummary):
+        pass
+
+    def retreive_local_summary(self, days: int) -> List[PersonalSummary]:
+        return self.local_db.get_summaries_last_n_days(days)
+
+    def retreive_cloud_summary(self, days: int):
+        pass
+
+    def retrieve_cloud_info(self, *args, **kwargs):
+        pass
+
+    def local_to_cloud(self , *args, **kwargs):
+        pass
     
-    def insert_conversation_local(self, conversation_id: str, user_id: str, message: str, response: str, date: Optional[str] = None):
-        cursor = self.local_conn.cursor()
-        if date is None:
-            from datetime import datetime
-            date = datetime.now().strftime('%d-%m-%Y')
-        cursor.execute('''
-        INSERT OR REPLACE INTO conversations (conversation_id, user_id, message, response, date)
-        VALUES (?, ?, ?, ?, ?)
-        ''', (conversation_id, user_id, message, response, date))
-        self.local_conn.commit()
-    
-    def insert_user_data_local(self, user_id: str, data: Dict[str, Any]):
-        cursor = self.local_conn.cursor()
-        cursor.execute('''
-        INSERT OR REPLACE INTO user_data (user_id, data)
-        VALUES (?, ?)
-        ''', (user_id, json.dumps(data)))
-        self.local_conn.commit()
-    
-    def get_unsynced_conversations(self) -> List[tuple]:
-        cursor = self.local_conn.cursor()
-        cursor.execute('SELECT * FROM conversations WHERE synced = 0')
-        return cursor.fetchall()
-    
-    def get_unsynced_user_data(self) -> List[tuple]:
-        cursor = self.local_conn.cursor()
-        cursor.execute('SELECT * FROM user_data WHERE synced = 0')
-        return cursor.fetchall()
-    
-    def mark_conversation_synced(self, conversation_id: int):
-        cursor = self.local_conn.cursor()
-        cursor.execute('UPDATE conversations SET synced = 1 WHERE id = ?', (conversation_id,))
-        self.local_conn.commit()
-    
-    def mark_user_data_synced(self, user_data_id: int):
-        cursor = self.local_conn.cursor()
-        cursor.execute('UPDATE user_data SET synced = 1 WHERE id = ?', (user_data_id,))
-        self.local_conn.commit()
-    
-    def sync_local_to_cloud(self):
-        conversations = self.get_unsynced_conversations()
-        for conv in conversations:
-            conv_id, conversation_id, user_id, message, response, date, timestamp, _ = conv
-            doc_ref = self.db.collection('conversations').document(str(conversation_id))
-            doc_ref.set({
-                'conversation_id': conversation_id,
-                'user_id': user_id,
-                'message': message,
-                'response': response,
-                'date': date,
-                'timestamp': timestamp
-            })
-            self.mark_conversation_synced(conv_id)
-        
-        user_data = self.get_unsynced_user_data()
-        for user in user_data:
-            user_data_id, user_id, data, timestamp, _ = user
-            doc_ref = self.db.collection('user_data').document(str(user_data_id))
-            doc_ref.set({
-                'user_id': user_id,
-                'data': json.loads(data),
-                'timestamp': timestamp
-            })
-            self.mark_user_data_synced(user_data_id)
-    
-    def add_document_to_cloud(self, collection: str, doc_id: str, data: Dict[str, Any]):
-        doc_ref = self.db.collection(collection).document(doc_id)
-        doc_ref.set(data)
-    
-    def get_document_from_cloud(self, collection: str, doc_id: str) -> Optional[Dict[str, Any]]:
-        doc_ref = self.db.collection(collection).document(doc_id)
-        doc = doc_ref.get()
-        return doc.to_dict() if doc.exists else None
-    
-    def update_document_in_cloud(self, collection: str, doc_id: str, data: Dict[str, Any]):
-        doc_ref = self.db.collection(collection).document(doc_id)
-        doc_ref.update(data)
-    
-    def delete_document_from_cloud(self, collection: str, doc_id: str):
-        doc_ref = self.db.collection(collection).document(doc_id)
-        doc_ref.delete()
-    
-    def query_collection_cloud(self, collection: str, field: str, operator: str, value: Any) -> List[Dict[str, Any]]:
-        docs = self.db.collection(collection).where(field, operator, value).stream()
-        return [doc.to_dict() for doc in docs]
-    
-    def get_all_documents_cloud(self, collection: str) -> List[Dict[str, Any]]:
-        docs = self.db.collection(collection).stream()
-        return [doc.to_dict() for doc in docs]
-    
-    def close_connection(self):
-        if self.local_conn:
-            self.local_conn.close()
+    def cloud_to_local(self, *args, **kwargs):
+        pass
+
+    def delete_local_summary(self, start_date: str, end_date: str) -> int:
+        return self.local_db.delete_summaries_in_range(start_date, end_date)
+
+    def delete_local_summary_days(self, days: int) -> int:
+        return self.local_db.delete_summaries_last_n_days(days)

@@ -3,8 +3,9 @@ from datetime import datetime, date
 import logging
 from chat import ChatCompletionBase
 from prompt_manager import PromptManager
+from custom_promt import SYSTEM_PROMPT_FIRST_MESSAGE
 from structures import Analysis, Summarise, PersonalSummary, ConversationInsights
-
+from db import DB
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ChatBot:
     """High-level chatbot that integrates classification and response generation."""
 
-    def __init__(self, config_path: str, question_info: Optional[List[Dict[str, str]]] = None):
+    def __init__(self, config_path: str):
         """Initialize underlying chat model and prompt manager."""
         self.chat = ChatCompletionBase(config_path)
         self.prompts = PromptManager(self.chat)
@@ -22,15 +23,15 @@ class ChatBot:
         self._previous_Summary: List[str] = []
         self._last_context_reset_date: date = datetime.now().date()
         
-        # Dummy db attribute - will be properly implemented later
-        self.db = None
+        self.db = DB(config_path)
         
         # Get context window threshold (80% of max input tokens)
         context_info = self.chat.get_model_context_window()
         max_input_tokens = context_info['max_input_tokens']
         self._context_threshold = int(max_input_tokens * 0.7)  # 70% threshold
-        self.chat.config['question_info'] = question_info
+       
         # to identify it is first message or not if it is first message then we need to add the user info to the message
+        self.chat.config['question_info'] = self.get_question_info()
         self.initial_message=True
 
     def classify_category(self, user_query: str, chat_history: Optional[List[Any]] = None) -> str:
@@ -52,12 +53,9 @@ class ChatBot:
     ) -> str:
         """Generate a reply using specialised prompt, query, and optional memory."""
         self._messages.append({"user": user_query})
-        specialised_prompt = self.get_specialised_prompt(
-            user_query,
-            chat_history if chat_history is not None else self._messages,
-        )
         if self.initial_message:
             self.initial_message = False
+            specialised_prompt = None
             analysis_input = Analysis(
                 user_query=user_query,
                 specialised_prompt=specialised_prompt,
@@ -68,7 +66,13 @@ class ChatBot:
                     "question_info": self.chat.config['question_info'] if self.chat.config['question_info'] else None,
                 }),
             )
+            response_text = self.chat.invoke_model(input=analysis_input,system_prompt_override=SYSTEM_PROMPT_FIRST_MESSAGE, **kwargs)
+
         else:
+            specialised_prompt = self.get_specialised_prompt(
+            user_query,
+            chat_history if chat_history is not None else self._messages,
+        )
             analysis_input = Analysis(
                 user_query=user_query,
                 specialised_prompt=specialised_prompt,
@@ -78,7 +82,7 @@ class ChatBot:
                     "previous_insights": self._previous_Insights if self._previous_Insights else None,
                 }),
             )
-        response_text = self.chat.invoke_model(input=analysis_input, **kwargs)
+            response_text = self.chat.invoke_model(input=analysis_input, **kwargs)
         try:
             sp_preview = specialised_prompt[:80] if isinstance(specialised_prompt, str) else str(type(specialised_prompt))
             rt_preview = response_text[:80] if isinstance(response_text, str) else str(type(response_text))
@@ -97,11 +101,14 @@ class ChatBot:
         reply = self.get_reply(user_query="")
         return reply
 
+
     def get_notification(self) -> str:
         """Set initial message to False."""
         self.initial_message = False
         reply = self.get_reply(user_query="")
         return reply
+
+
     def summarize(self, **kwargs) -> PersonalSummary:
         """Summarize internal conversation history for memory (structured)."""
         summ_input = Summarise(chat_history={"messages": self._messages})
@@ -234,15 +241,20 @@ class ChatBot:
             self._messages = []
         except Exception as e:
             logger.warning(f"app_exit summarisation failed: {e}")
+
+
     def hard_reset(self) -> None:
         """Dump current memory to DB if available, then clear all and reset initial state."""
         try:
             if self.db and hasattr(self.db, "save_conversation"):
                 try:
+                    from datetime import datetime
+                    timestamp = datetime.now().isoformat()
                     self.db.save_conversation(
                         messages=self._messages,
                         previous_summaries=self._previous_Summary,
                         previous_insights=self._previous_Insights,
+                        timestamp=timestamp
                     )
                 except Exception as db_err:
                     logger.warning(f"chat_reset DB save failed: {db_err}")
@@ -251,6 +263,10 @@ class ChatBot:
             self._previous_Summary = []
             self._previous_Insights = []
             self.initial_message = True
+
+    def get_question_info():
+        pass
+
     def model_info(self) -> Dict:
         """Return underlying model metadata."""
         return self.chat.get_model_info()
@@ -263,6 +279,11 @@ class ChatBot:
         """Clear stored history."""
         self._messages = []
     
+
+
+
+
+
 
 
 

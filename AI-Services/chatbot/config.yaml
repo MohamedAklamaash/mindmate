@@ -14,3 +14,4 @@ summary_threshold: 11
 temperature: 0.7
 top_k: 40
 top_p: 1.0
+local_db_path: .cache/local_db.sqlite
