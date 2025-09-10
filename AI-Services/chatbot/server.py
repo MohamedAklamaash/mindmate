@@ -46,3 +46,9 @@ async def chat_endpoint(req: ChatRequest):
 async def model_info():
     """Get chatbot model info"""
     return bot.model_info()
+
+
+# Hosting code
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
