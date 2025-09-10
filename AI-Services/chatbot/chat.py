@@ -122,19 +122,19 @@ class ChatCompletionBase(ABC):
         # Determine input type and prepare content accordingly
         if hasattr(input, '__class__') and input.__class__.__name__ == 'Analysis':
             # For Analysis: combine specialised_prompt, user_query, and memory
-            if input.memory has question_info:
+            if 'question_info' in input.memory:
                 logger.info("chat.invoke_model.call input_type=Analysis question_info=True")
                 messages=input.memory['messages']
-                previous_context = input.memory['previous_context']
+                previous_summary = input.memory['previous_summary']
                 previous_insights = input.memory['previous_insights']
                 question_info = input.memory['question_info']
             else:
                 messages = input.memory['messages']
-                previous_context = input.memory['previous_context']
+                previous_summary = input.memory['previous_summary']
                 previous_insights = input.memory['previous_insights']
                 question_info = None
 
-            content = f"{input.specialised_prompt}\n\nUser Query: {input.user_query}\n\nMessages: {messages}\n\nPrevious Context: {previous_context}\n\nPrevious Insights: {previous_insights}\n\nQuestion Info: {question_info}"
+            content = f"{input.specialised_prompt}\n\nUser Query: {input.user_query}\n\n Previous Conversation Messages: {messages}\n\nPrevious Summary: {previous_summary}\n\nPrevious Insights: {previous_insights}\n\nQuestion Info: {question_info} NOTE: use this question info to get started with the conversation and remember it is the first message and the user query will be empty"
             system_prompt = SYSTEM_PROMPT_ANALYSIS
             
         elif hasattr(input, '__class__') and input.__class__.__name__ == 'Summarise':

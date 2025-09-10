@@ -3,7 +3,7 @@ from datetime import datetime, date
 import logging
 from chat import ChatCompletionBase
 from prompt_manager import PromptManager
-from structures import Analysis, Summarise, PersonalSummary
+from structures import Analysis, Summarise, PersonalSummary, ConversationInsights
 
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -43,7 +43,7 @@ class ChatBot:
         history = chat_history if chat_history is not None else self._messages
         return self.prompts.get_specialised_prompt(user_query, history)
 
-    def reply(
+    def get_reply(
         self,
         user_query: str,
         chat_history: Optional[List[Any]] = None,
@@ -54,7 +54,7 @@ class ChatBot:
         self._messages.append({"user": user_query})
         specialised_prompt = self.get_specialised_prompt(
             user_query,
-            chat_history if chat_history is not None else None,
+            chat_history if chat_history is not None else self._messages,
         )
         if self.initial_message:
             self.initial_message = False
@@ -63,8 +63,8 @@ class ChatBot:
                 specialised_prompt=specialised_prompt,
                 memory=(memory or {
                     "messages": self._messages if self._messages else None,
-                    "previous context": self._previous_Summary if self._previous_Summary else None,
-                    "previous insights": self._previous_Insights if self._previous_Insights else None,
+                    "previous_summary": self._previous_Summary if self._previous_Summary else None,
+                    "previous_insights": self._previous_Insights if self._previous_Insights else None,
                     "question_info": self.chat.config['question_info'] if self.chat.config['question_info'] else None,
                 }),
             )
@@ -74,8 +74,8 @@ class ChatBot:
                 specialised_prompt=specialised_prompt,
                 memory=(memory or {
                     "messages": self._messages if self._messages else None,
-                    "previous context": self._previous_Summary if self._previous_Summary else None,
-                    "previous insights": self._previous_Insights if self._previous_Insights else None,
+                    "previous_summary": self._previous_Summary if self._previous_Summary else None,
+                    "previous_insights": self._previous_Insights if self._previous_Insights else None,
                 }),
             )
         response_text = self.chat.invoke_model(input=analysis_input, **kwargs)
@@ -87,44 +87,84 @@ class ChatBot:
             pass
         if self._messages:
             self._messages[-1]["ai"] = response_text
-        self._maybe_summarize()
+        # Check if we should summarise and compress oldest messages
+        self.maybe_summarise()
         return response_text
 
-    def summarize(self, **kwargs) -> str:
-        """Summarize internal conversation history for memory."""
+    def get_initial_message(self) -> str:
+        """Set initial message to False."""
+        self.initial_message = True
+        reply = self.get_reply(user_query="")
+        return reply
+
+    def get_notification(self) -> str:
+        """Set initial message to False."""
+        self.initial_message = False
+        reply = self.get_reply(user_query="")
+        return reply
+    def summarize(self, **kwargs) -> PersonalSummary:
+        """Summarize internal conversation history for memory (structured)."""
         summ_input = Summarise(chat_history={"messages": self._messages})
-        summary = self.chat.invoke_model(input=summ_input, request_format={"type": "list", "schema": PersonalSummary}, **kwargs)
+        summary = self.chat.invoke_model(
+            input=summ_input,
+            request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
+            **kwargs,
+        )
         try:
             logger.info("chatbot.summarize.success")
         except Exception:
             pass
         return summary
 
-    def model_info(self) -> Dict:
-        """Return underlying model metadata."""
-        return self.chat.get_model_info()
+    def maybe_summarise(self) -> None:
+        """If context exceeds threshold, summarise the oldest 20% of messages and store results.
 
-    def history(self) -> Dict:
-        """Return stored messages and previous context list."""
-        return {"messages": list(self._messages), "previous context": list(self._previous_context)}
-
-    def reset(self) -> None:
-        """Clear stored history."""
-        self._messages = []
-
-    def _maybe_summarize(self) -> None:
-        """Summarize when context length exceeds threshold and store as previous context."""
+        - Take the first 20% of `self._messages` as the oldest chunk
+        - Remove them from `self._messages`
+        - Summarise that chunk using structured `PersonalSummary`
+        - Append summary text to `self._previous_Summary`
+        - Append insights to `self._previous_Insights`
+        """
         try:
-            # Calculate approximate token count for current context
             current_context_length = self._estimate_context_length()
-            
-            if current_context_length > self._context_threshold:
-                logger.info(f"Context length ({current_context_length}) exceeds threshold ({self._context_threshold}), summarizing...")
-                summary_text = self.summarize()
-                self._previous_context.append(summary_text.summary)
-                self.reset()
+            if current_context_length <= self._context_threshold:
+                return
+
+            if not self._messages:
+                return
+
+            logger.info(
+                f"Context length ({current_context_length}) exceeds threshold ({self._context_threshold}); compressing oldest messages"
+            )
+
+            # Calculate how many messages form the oldest 20%
+            total_messages = len(self._messages)
+            num_old = max(1, int(total_messages * 0.2))
+            old_chunk = self._messages[:num_old]
+
+            # Remove the oldest chunk from active messages
+            self._messages = self._messages[num_old:]
+
+            # Summarise the removed chunk
+            summ_input = Summarise(chat_history={"messages": old_chunk})
+            result: PersonalSummary = self.chat.invoke_model(
+                input=summ_input,
+                request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
+            )
+
+            # Persist structured summary and insights
+            if getattr(result, "summary", None):
+                self._previous_Summary.append(result.summary)
+            insights_obj = getattr(result, "insights", None)
+            if insights_obj is not None:
+                # Store as JSON-serialisable string to avoid Pydantic object leakage if needed
+                try:
+                    # Prefer storing the model itself if consumers handle it, else string
+                    self._previous_Insights.append(insights_obj)
+                except Exception:
+                    self._previous_Insights.append(str(insights_obj))
         except Exception as e:
-            logger.warning(f"Failed to summarize: {e}")
+            logger.warning(f"maybe_summarise failed: {e}")
     
     def _estimate_context_length(self) -> int:
         """Estimate the total context length in tokens (approximate)."""
@@ -140,8 +180,8 @@ class ChatBot:
             elif isinstance(msg, str):
                 total_chars += len(msg)
         
-        # Add previous context length
-        for context in self._previous_context:
+        # Add previous summaries length
+        for context in self._previous_Summary:
             if isinstance(context, str):
                 total_chars += len(context)
         
@@ -152,23 +192,80 @@ class ChatBot:
         total_chars += system_prompt_chars
         
         # Convert to approximate token count (1 token ≈ 2.5 characters)
-        estimated_tokens = total_chars // 2.5
+        estimated_tokens = int(total_chars / 2.5)
         
         return estimated_tokens
 
     def _maybe_clear_previous_context(self) -> None:
-        """Clear previous context at local midnight only."""
+        """At local midnight, create a daily rollup and clear previous summaries/insights."""
         now = datetime.now()
         if now.date() != self._last_context_reset_date:
-            print("trying to find the overall insights of the conversation")
-            summary_text = self.summarize(request_format={"type": "list", "schema": ConversationInsights})
-            print("summary_text", summary_text)
-            self._previous_context.clear()
-            self._last_context_reset_date = now.date()
             try:
-                logger.info("chatbot.previous_context.cleared_midnight")
+                # Create an overarching insights rollup for the day from current messages
+                daily_summary: PersonalSummary = self.summarize()
+                if getattr(daily_summary, "summary", None):
+                    self._previous_Summary.append(daily_summary.summary)
+                if getattr(daily_summary, "insights", None):
+                    self._previous_Insights.append(daily_summary.insights)
             except Exception:
                 pass
+            self._previous_Summary.clear()
+            self._previous_Insights.clear()
+            self._last_context_reset_date = now.date()
+            try:
+                logger.info("chatbot.previous_memory.cleared_midnight")
+            except Exception:
+                pass
+
+    def app_exit(self) -> None:
+        """On app exit, summarise all remaining messages and store to previous summary/insights, then clear messages."""
+        try:
+            if self._messages:
+                summ_input = Summarise(chat_history={"messages": self._messages})
+                result: PersonalSummary = self.chat.invoke_model(
+                    input=summ_input,
+                    request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
+                )
+                if getattr(result, "summary", None):
+                    self._previous_Summary.append(result.summary)
+                if getattr(result, "insights", None):
+                    self._previous_Insights.append(result.insights)
+            # Clear active messages after persisting
+            self._messages = []
+        except Exception as e:
+            logger.warning(f"app_exit summarisation failed: {e}")
+    def hard_reset(self) -> None:
+        """Dump current memory to DB if available, then clear all and reset initial state."""
+        try:
+            if self.db and hasattr(self.db, "save_conversation"):
+                try:
+                    self.db.save_conversation(
+                        messages=self._messages,
+                        previous_summaries=self._previous_Summary,
+                        previous_insights=self._previous_Insights,
+                    )
+                except Exception as db_err:
+                    logger.warning(f"chat_reset DB save failed: {db_err}")
+        finally:
+            self._messages = []
+            self._previous_Summary = []
+            self._previous_Insights = []
+            self.initial_message = True
+    def model_info(self) -> Dict:
+        """Return underlying model metadata."""
+        return self.chat.get_model_info()
+
+    def get_history(self) -> Dict:
+        """Return stored messages and previous context list."""
+        return {"messages": list(self._messages), "previous summary": list(self._previous_Summary), "previous insights": list(self._previous_Insights)}
+
+    def reset(self) -> None:
+        """Clear stored history."""
+        self._messages = []
+    
+
+
+
 __all__ = ["ChatBot"]
 
 
