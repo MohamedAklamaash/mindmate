@@ -4,4 +4,6 @@
 **/.env.*
 chatbot/test.py
 chatbot/test2.py
+chatbot/*.md
+chatbot/CHATBOT_FLOW.md
 # Ignore any file or folder named .env anywhere
