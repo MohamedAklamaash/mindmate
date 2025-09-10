@@ -550,6 +550,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 30,
+    marginTop: 15,
   },
   title: {
     fontSize: 24,
@@ -644,7 +645,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -714,7 +715,7 @@ const styles = StyleSheet.create({
   courseCard: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -733,6 +734,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    marginTop: 4,
   },
   courseInfo: {
     flex: 1,
@@ -742,6 +744,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     marginBottom: 2,
+    marginTop: 5,
   },
   courseInstructor: {
     fontSize: 12,
@@ -761,7 +764,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
     marginBottom: 4,
-  },
+    marginTop: 5,
+    marginEnd: 5,
+ },
   pointsText: {
     fontSize: 10,
     color: '#065F46',
@@ -770,6 +775,7 @@ const styles = StyleSheet.create({
   completedContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 12,
     gap: 4,
   },
   completedText: {

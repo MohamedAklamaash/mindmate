@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl, Pressable, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getAllAvailableTherapists, bookTherapistSession, getUserAllBookedSessions, checkUserTimeConflict } from '@/services/firebaseService';
+import { getAllAvailableTherapists, bookTherapistSession, getUserTherapistSessions, checkUserTimeConflict, TherapistSession } from '@/services/firebaseService';
 import { useUserStore } from '@/store/userStore';
 import { useThemeStore, getThemeColors } from '@/store/themeStore';
 
@@ -27,7 +27,7 @@ export default function TherapistScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bookingLoading, setBookingLoading] = useState<string | null>(null);
-  const [userBookedSessions, setUserBookedSessions] = useState<any[]>([]);
+  const [userBookedSessions, setUserBookedSessions] = useState<TherapistSession[]>([]);
   
   const user = useUserStore((state) => state.user);
 
@@ -91,7 +91,7 @@ export default function TherapistScreen() {
     if (!user?.firestoreId) return;
     
     try {
-      const bookedSessions = await getUserAllBookedSessions(user.firestoreId);
+      const bookedSessions = await getUserTherapistSessions(user.firestoreId);
       setUserBookedSessions(bookedSessions);
     } catch (error) {
       console.error('Error fetching user booked sessions:', error);

@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useUserStore } from '@/store/userStore';
 import { useThemeStore, Theme, getThemeColors } from '@/store/themeStore';
-import { updateTherapistDescription, getTherapistData, getUserAllBookedSessions } from '@/services/firebaseService';
+import { updateTherapistDescription, getTherapistData, getUserTherapistSessions, TherapistSession } from '@/services/firebaseService';
 
 type SidebarProps = {
   isOpen: boolean;
@@ -194,6 +194,36 @@ const Sidebar = memo(function Sidebar({
   );
 });
 
+// Helper functions for formatting
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const formatTime = (timeString: string) => {
+  const [hours, minutes] = timeString.split(':');
+  const date = new Date();
+  date.setHours(parseInt(hours), parseInt(minutes));
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+const formatDuration = (duration: number) => {
+  if (duration < 60) {
+    return `${duration} min`;
+  }
+  const hours = Math.floor(duration / 60);
+  const minutes = duration % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+};
+
 export default function HomeScreen() {
   const user = useUserStore((state) => state.user);
   const userType = useUserStore((state) => state.userType);
@@ -202,9 +232,14 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
-  // User upcoming session state
-  const [upcomingSession, setUpcomingSession] = useState<any>(null);
+  // User session state
+  const [upcomingSession, setUpcomingSession] = useState<TherapistSession | null>(null);
+  const [allUpcomingSessions, setAllUpcomingSessions] = useState<TherapistSession[]>([]);
+  const [completedSessions, setCompletedSessions] = useState<TherapistSession[]>([]);
   const [loadingSession, setLoadingSession] = useState(false);
+  
+  // Session tab state
+  const [selectedSessionTab, setSelectedSessionTab] = useState<'upcoming' | 'completed'>('upcoming');
   
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -233,50 +268,62 @@ export default function HomeScreen() {
   }, [userType, user?.firestoreId]);
 
   // Fetch user's upcoming sessions
-  // Fetch user's upcoming sessions
   const fetchUpcomingSession = async () => {
     if (userType === 'user' && user?.firestoreId) {
       setLoadingSession(true);
       try {
-        const bookedSessions = await getUserAllBookedSessions(user.firestoreId);
+        console.log('Fetching sessions for user:', user.firestoreId);
+        const bookedSessions = await getUserTherapistSessions(user.firestoreId);
+        console.log('Retrieved sessions:', bookedSessions);
         
         if (bookedSessions.length > 0) {
-          // Filter future sessions and sort by date and time
           const now = new Date();
-          const futureeSessions = bookedSessions.filter(session => {
+          
+          // Filter future sessions and sort by date and time
+          const futuresSessions = bookedSessions.filter((session: TherapistSession) => {
             const sessionDateTime = new Date(`${session.date}T${session.startTime}`);
-            return sessionDateTime > now;
-          }).sort((a, b) => {
+            return sessionDateTime > now && session.status === 'booked';
+          }).sort((a: TherapistSession, b: TherapistSession) => {
             const dateA = new Date(`${a.date}T${a.startTime}`);
             const dateB = new Date(`${b.date}T${b.startTime}`);
             return dateA.getTime() - dateB.getTime();
           });
 
-          if (futureeSessions.length > 0) {
-            // Get therapist data for the upcoming session
-            const nextSession = futureeSessions[0];
-            try {
-              const therapistData = await getTherapistData(nextSession.therapistId);
-              setUpcomingSession({
-                ...nextSession,
-                therapistName: therapistData.name || 'Unknown Therapist'
-              });
-            } catch (error) {
-              console.error('Error fetching therapist data:', error);
-              setUpcomingSession({
-                ...nextSession,
-                therapistName: 'Unknown Therapist'
-              });
-            }
+          // Filter past sessions and sort by date and time (most recent first)
+          const pastSessions = bookedSessions.filter((session: TherapistSession) => {
+            const sessionDateTime = new Date(`${session.date}T${session.startTime}`);
+            return sessionDateTime <= now;
+          }).sort((a: TherapistSession, b: TherapistSession) => {
+            const dateA = new Date(`${a.date}T${a.startTime}`);
+            const dateB = new Date(`${b.date}T${b.startTime}`);
+            return dateB.getTime() - dateA.getTime(); // Descending order for completed sessions
+          });
+
+          console.log('Filtered future sessions:', futuresSessions);
+          console.log('Filtered completed sessions:', pastSessions);
+          
+          setAllUpcomingSessions(futuresSessions);
+          setCompletedSessions(pastSessions);
+
+          if (futuresSessions.length > 0) {
+            const nextSession = futuresSessions[0];
+            setUpcomingSession(nextSession);
+            console.log('Next session set:', nextSession);
           } else {
             setUpcomingSession(null);
+            console.log('No future sessions found');
           }
         } else {
           setUpcomingSession(null);
+          setAllUpcomingSessions([]);
+          setCompletedSessions([]);
+          console.log('No sessions found for user');
         }
       } catch (error) {
         console.error('Error fetching upcoming sessions:', error);
         setUpcomingSession(null);
+        setAllUpcomingSessions([]);
+        setCompletedSessions([]);
       } finally {
         setLoadingSession(false);
       }
@@ -722,58 +769,180 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Upcoming Session Card - moved to bottom */}
+          {/* Sessions Section with Tabs */}
           <View style={styles.sessionSection}>
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Upcoming Session</Text>
-            
-            {loadingSession ? (
-              <View style={[styles.sessionCard, { backgroundColor: themeColors.surface }]}>
-                <ActivityIndicator size="small" color={themeColors.primary} />
-                <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>Loading session...</Text>
-              </View>
-            ) : upcomingSession ? (
-              <View style={[styles.sessionCard, { backgroundColor: themeColors.surface }]}>
-                <View style={styles.sessionHeader}>
-                  <View style={[styles.sessionIconContainer, { backgroundColor: themeColors.background }]}>
-                    <MaterialCommunityIcons name="calendar-check" size={24} color={themeColors.primary} />
+            {/* Tab Headers */}
+            <View style={styles.sessionTabContainer}>
+              <Pressable 
+                style={[
+                  styles.sessionTab, 
+                  selectedSessionTab === 'upcoming' && [styles.activeSessionTab, { borderBottomColor: themeColors.primary }]
+                ]}
+                onPress={() => setSelectedSessionTab('upcoming')}
+              >
+                <Text style={[
+                  styles.sessionTabText, 
+                  { color: selectedSessionTab === 'upcoming' ? themeColors.primary : themeColors.textSecondary }
+                ]}>
+                  Upcoming Sessions
+                </Text>
+                {allUpcomingSessions.length > 0 && (
+                  <View style={[styles.sessionTabBadge, { backgroundColor: themeColors.primary }]}>
+                    <Text style={styles.sessionTabBadgeText}>{allUpcomingSessions.length}</Text>
                   </View>
-                  <View style={styles.sessionInfo}>
-                    <Text style={[styles.therapistName, { color: themeColors.text }]}>{upcomingSession.therapistName}</Text>
-                    <Text style={[styles.sessionType, { color: themeColors.textSecondary }]}>{upcomingSession.fieldType}</Text>
+                )}
+              </Pressable>
+
+              <Pressable 
+                style={[
+                  styles.sessionTab, 
+                  selectedSessionTab === 'completed' && [styles.activeSessionTab, { borderBottomColor: themeColors.success }]
+                ]}
+                onPress={() => setSelectedSessionTab('completed')}
+              >
+                <Text style={[
+                  styles.sessionTabText, 
+                  { color: selectedSessionTab === 'completed' ? themeColors.success : themeColors.textSecondary }
+                ]}>
+                  Completed Sessions
+                </Text>
+                {completedSessions.length > 0 && (
+                  <View style={[styles.sessionTabBadge, { backgroundColor: themeColors.success }]}>
+                    <Text style={styles.sessionTabBadgeText}>{completedSessions.length}</Text>
                   </View>
+                )}
+              </Pressable>
+            </View>
+
+            {/* Content Area */}
+            <View style={styles.sessionContentArea}>
+              {loadingSession ? (
+                <View style={[styles.sessionCard, { backgroundColor: themeColors.surface }]}>
+                  <ActivityIndicator size="small" color={themeColors.primary} />
+                  <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>Loading sessions...</Text>
                 </View>
-                
-                <View style={styles.sessionDetails}>
-                  <View style={styles.sessionDetailRow}>
-                    <MaterialCommunityIcons name="calendar" size={16} color={themeColors.textSecondary} />
-                    <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>{formatDate(upcomingSession.date)}</Text>
+              ) : selectedSessionTab === 'upcoming' ? (
+                // Upcoming Sessions Content
+                upcomingSession ? (
+                  <View style={[styles.sessionCard, { backgroundColor: themeColors.surface }]}>
+                    <View style={styles.sessionHeader}>
+                      <View style={[styles.sessionIconContainer, { backgroundColor: themeColors.background }]}>
+                        <MaterialCommunityIcons name="calendar-check" size={24} color={themeColors.primary} />
+                      </View>
+                      <View style={styles.sessionInfo}>
+                        <Text style={[styles.therapistName, { color: themeColors.text }]}>{upcomingSession.therapistName}</Text>
+                        <Text style={[styles.sessionType, { color: themeColors.textSecondary }]}>{upcomingSession.fieldType}</Text>
+                      </View>
+                      <View style={styles.sessionStatus}>
+                        <Text style={[styles.sessionStatusText, { color: themeColors.accent }]}>
+                          {upcomingSession.status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.sessionDetails}>
+                      <View style={styles.sessionDetailRow}>
+                        <MaterialCommunityIcons name="calendar" size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>{formatDate(upcomingSession.date)}</Text>
+                      </View>
+                      <View style={styles.sessionDetailRow}>
+                        <MaterialCommunityIcons name="clock" size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>
+                          {formatTime(upcomingSession.startTime)} • {formatDuration(upcomingSession.duration)}
+                        </Text>
+                      </View>
+                      <View style={styles.sessionDetailRow}>
+                        <MaterialCommunityIcons name="currency-usd" size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>${upcomingSession.price}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.sessionActions}>
+                      <Pressable style={[styles.sessionButton, { backgroundColor: themeColors.primary }]}>
+                        <MaterialCommunityIcons name="video" size={16} color="white" />
+                        <Text style={styles.sessionButtonText}>Join Session</Text>
+                      </Pressable>
+                      
+                      {allUpcomingSessions.length > 1 && (
+                        <Pressable style={[styles.viewAllButton, { borderColor: themeColors.border }]}>
+                          <Text style={[styles.viewAllButtonText, { color: themeColors.textSecondary }]}>
+                            View All ({allUpcomingSessions.length})
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
-                  <View style={styles.sessionDetailRow}>
-                    <MaterialCommunityIcons name="clock" size={16} color={themeColors.textSecondary} />
-                    <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>
-                      {formatTime(upcomingSession.startTime)} • {formatDuration(upcomingSession.duration)}
+                ) : (
+                  <View style={[styles.noSessionCard, { backgroundColor: themeColors.surface }]}>
+                    <MaterialCommunityIcons name="calendar-plus" size={48} color={themeColors.textMuted} />
+                    <Text style={[styles.noSessionTitle, { color: themeColors.text }]}>No Upcoming Sessions</Text>
+                    <Text style={[styles.noSessionSubtitle, { color: themeColors.textSecondary }]}>
+                      Visit the Therapist tab to book a session with one of our qualified therapists.
                     </Text>
                   </View>
-                  <View style={styles.sessionDetailRow}>
-                    <MaterialCommunityIcons name="currency-usd" size={16} color={themeColors.textSecondary} />
-                    <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>${upcomingSession.price}</Text>
-                  </View>
-                </View>
+                )
+              ) : (
+                // Completed Sessions Content
+                completedSessions.length > 0 ? (
+                  <View style={styles.completedSessionsList}>
+                    {completedSessions.slice(0, 3).map((session, index) => (
+                      <View key={`${session.therapistId}-${session.date}-${session.startTime}`} style={[styles.completedSessionCard, { backgroundColor: themeColors.surface }]}>
+                        <View style={styles.sessionHeader}>
+                          <View style={[styles.sessionIconContainer, { backgroundColor: themeColors.background }]}>
+                            <MaterialCommunityIcons name="check-circle" size={24} color={themeColors.success} />
+                          </View>
+                          <View style={styles.sessionInfo}>
+                            <Text style={[styles.therapistName, { color: themeColors.text }]}>{session.therapistName}</Text>
+                            <Text style={[styles.sessionType, { color: themeColors.textSecondary }]}>{session.fieldType}</Text>
+                          </View>
+                          <View style={styles.sessionStatus}>
+                            <Text style={[styles.completedStatusText, { color: themeColors.success }]}>
+                              COMPLETED
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        <View style={styles.sessionDetails}>
+                          <View style={styles.sessionDetailRow}>
+                            <MaterialCommunityIcons name="calendar" size={16} color={themeColors.textSecondary} />
+                            <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>{formatDate(session.date)}</Text>
+                          </View>
+                          <View style={styles.sessionDetailRow}>
+                            <MaterialCommunityIcons name="clock" size={16} color={themeColors.textSecondary} />
+                            <Text style={[styles.sessionDetailText, { color: themeColors.textSecondary }]}>
+                              {formatTime(session.startTime)} • {formatDuration(session.duration)}
+                            </Text>
+                          </View>
+                        </View>
 
-                <Pressable style={[styles.sessionButton, { backgroundColor: themeColors.primary }]}>
-                  <MaterialCommunityIcons name="video" size={16} color="white" />
-                  <Text style={styles.sessionButtonText}>Join Session</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={[styles.noSessionCard, { backgroundColor: themeColors.surface }]}>
-                <MaterialCommunityIcons name="calendar-plus" size={48} color={themeColors.textMuted} />
-                <Text style={[styles.noSessionTitle, { color: themeColors.text }]}>No Upcoming Sessions</Text>
-                <Text style={[styles.noSessionSubtitle, { color: themeColors.textSecondary }]}>
-                  Visit the Therapist tab to book a session with one of our qualified therapists.
-                </Text>
-              </View>
-            )}
+                        <View style={styles.completedSessionActions}>
+                          <Pressable style={[styles.reviewButton, { borderColor: themeColors.border }]}>
+                            <MaterialCommunityIcons name="star-outline" size={16} color={themeColors.textSecondary} />
+                            <Text style={[styles.reviewButtonText, { color: themeColors.textSecondary }]}>Leave Review</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+                    
+                    {completedSessions.length > 3 && (
+                      <Pressable style={[styles.viewAllCompletedButton, { borderColor: themeColors.border }]}>
+                        <Text style={[styles.viewAllButtonText, { color: themeColors.textSecondary }]}>
+                          View All {completedSessions.length} Completed Sessions
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ) : (
+                  <View style={[styles.noSessionCard, { backgroundColor: themeColors.surface }]}>
+                    <MaterialCommunityIcons name="history" size={48} color={themeColors.textMuted} />
+                    <Text style={[styles.noSessionTitle, { color: themeColors.text }]}>No Completed Sessions</Text>
+                    <Text style={[styles.noSessionSubtitle, { color: themeColors.textSecondary }]}>
+                      Your completed therapy sessions will appear here after you've attended them.
+                    </Text>
+                  </View>
+                )
+              )}
+            </View>
           </View>
         </ScrollView>
         <Sidebar 
@@ -853,11 +1022,63 @@ const styles = StyleSheet.create({
   sessionSection: {
     marginBottom: 30,
   },
+  sessionSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sessionCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 16,
+  },
+  
+  // Session Tab Styles
+  sessionTabContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  sessionTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    gap: 8,
+  },
+  activeSessionTab: {
+    borderBottomWidth: 2,
+  },
+  sessionTabText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sessionTabBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  sessionTabBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sessionContentArea: {
+    minHeight: 200,
   },
   sessionCard: {
     backgroundColor: 'white',
@@ -888,6 +1109,14 @@ const styles = StyleSheet.create({
   },
   sessionInfo: {
     flex: 1,
+  },
+  sessionStatus: {
+    alignItems: 'flex-end',
+  },
+  sessionStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   therapistName: {
     fontSize: 18,
@@ -921,11 +1150,71 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     gap: 6,
+    flex: 1,
   },
   sessionButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  sessionActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  viewAllButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewAllButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  
+  // Completed Sessions Styles
+  completedSessionsList: {
+    gap: 12,
+  },
+  completedSessionCard: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+  },
+  completedStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  completedSessionActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 4,
+  },
+  reviewButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  viewAllCompletedButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
   },
   
   // No Session Card Styles

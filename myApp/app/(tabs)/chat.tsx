@@ -1,6 +1,6 @@
 // ChatScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated, Platform, KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -341,7 +341,12 @@ export default function ChatScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: getBackgroundColor() }]}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <View style={[styles.container, { backgroundColor: getBackgroundColor() }]}>
       {/* Header with title and close button */}
       <View style={[styles.header, { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
         <View style={styles.headerContent}>
@@ -392,13 +397,13 @@ export default function ChatScreen() {
       {/* Fixed input at bottom */}
       <View style={[styles.inputWrapper, { backgroundColor: themeColors.surface, borderTopColor: themeColors.border }]}>
         <View style={styles.inputContainer}>
-          <View style={[styles.inputBox, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+          <View style={[styles.inputBox, { backgroundColor: '#ffffff', borderColor: themeColors.border }]}>
             <TextInput
-              style={[styles.input, { color: themeColors.text }]}
+              style={[styles.input, { color: '#000000' }]}
               value={input}
               onChangeText={setInput}
-              placeholder="How are you feeling today?"
-              placeholderTextColor={themeColors.textMuted}
+              placeholder="Type a Message..."
+              placeholderTextColor="#888888"
               editable={!isLoading}
               onSubmitEditing={sendMessage}
               returnKeyType="send"
@@ -490,6 +495,7 @@ export default function ChatScreen() {
         </View>
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -549,7 +555,6 @@ const styles = StyleSheet.create({
   // Messages styles
   messagesWrapper: {
     flex: 1,
-    marginBottom: 80, // Add margin to prevent overlap with input
   },
   messagesContainer: { 
     padding: 16,
@@ -598,7 +603,6 @@ const styles = StyleSheet.create({
   
   // Input styles
   inputWrapper: {
-    height: 100,
     borderTopWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -618,11 +622,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   input: { 
     flex: 1, 

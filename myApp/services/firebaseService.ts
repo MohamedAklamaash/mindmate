@@ -28,6 +28,23 @@ export interface UserData {
   onboardingAnswers?: QuestionAnswers;
 }
 
+// Therapist session interface
+export interface TherapistSession {
+  id?: string;
+  userId: string;
+  therapistId: string;
+  therapistName: string;
+  scheduleId: string;
+  fieldType: string;
+  date: string;
+  startTime: string;
+  duration: number;
+  price: number;
+  status: 'booked' | 'completed' | 'cancelled';
+  bookedAt: any;
+  createdAt: any;
+}
+
 // Save user data with onboarding answers to Firestore
 export const saveUserWithAnswers = async (userData: Omit<UserData, 'id' | 'createdAt' | 'updatedAt'>, answers: QuestionAnswers): Promise<string> => {
   try {
@@ -196,13 +213,52 @@ export const getTherapistSchedules = async (therapistId: string): Promise<any[]>
 // Book a therapist session
 export const bookTherapistSession = async (therapistId: string, scheduleId: string, userId: string): Promise<void> => {
   try {
-    // Update the schedule to mark it as booked and assign the user
+    // Get the schedule details first
     const scheduleRef = doc(db, 'therapists', therapistId, 'schedules', scheduleId);
+    const scheduleDoc = await getDoc(scheduleRef);
+    
+    if (!scheduleDoc.exists()) {
+      throw new Error('Schedule not found');
+    }
+    
+    const scheduleData = scheduleDoc.data();
+    
+    // Get therapist details
+    const therapistRef = doc(db, 'therapists', therapistId);
+    const therapistDoc = await getDoc(therapistRef);
+    
+    if (!therapistDoc.exists()) {
+      throw new Error('Therapist not found');
+    }
+    
+    const therapistData = therapistDoc.data();
+    
+    // Update the schedule to mark it as booked and assign the user
     await updateDoc(scheduleRef, {
       userId: userId,
       booked: true,
       bookedAt: serverTimestamp()
     });
+
+    // Store the session in the user's therapist_sessions subcollection
+    const sessionData = {
+      userId: userId,
+      therapistId: therapistId,
+      therapistName: therapistData.name || 'Unknown Therapist',
+      scheduleId: scheduleId,
+      fieldType: scheduleData.fieldType,
+      date: scheduleData.date,
+      startTime: scheduleData.startTime,
+      duration: scheduleData.duration,
+      price: scheduleData.price,
+      status: 'booked',
+      bookedAt: serverTimestamp(),
+      createdAt: serverTimestamp()
+    };
+
+    // Add session to user's therapist_sessions subcollection
+    await addDoc(collection(db, 'users', userId, 'therapist_sessions'), sessionData);
+    
   } catch (error) {
     console.error('Error booking session: ', error);
     throw error;
@@ -330,7 +386,64 @@ export const getTherapistSchedulesForDate = async (therapistId: string, date: st
   }
 };
 
-// Get all booked sessions for a specific user across all therapists
+// Get all booked sessions for a specific user from their therapist_sessions subcollection
+export const getUserTherapistSessions = async (userId: string): Promise<TherapistSession[]> => {
+  try {
+    // Query the user's therapist_sessions subcollection
+    const sessionsSnapshot = await getDocs(collection(db, 'users', userId, 'therapist_sessions'));
+    
+    const userSessions = sessionsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TherapistSession));
+
+    // Sort by date and time (newest first)
+    userSessions.sort((a: TherapistSession, b: TherapistSession) => {
+      const dateA = new Date(`${a.date}T${a.startTime}`);
+      const dateB = new Date(`${b.date}T${b.startTime}`);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    return userSessions;
+  } catch (error) {
+    console.error('Error fetching user therapist sessions: ', error);
+    throw error;
+  }
+};
+
+// Get user session statistics
+export const getUserSessionStats = async (userId: string): Promise<{
+  totalSessions: number;
+  upcomingSessions: number;
+  completedSessions: number;
+}> => {
+  try {
+    const sessions = await getUserTherapistSessions(userId);
+    const now = new Date();
+    
+    const upcomingSessions = sessions.filter(session => {
+      const sessionDateTime = new Date(`${session.date}T${session.startTime}`);
+      return sessionDateTime > now && session.status === 'booked';
+    }).length;
+    
+    const completedSessions = sessions.filter(session => 
+      session.status === 'completed'
+    ).length;
+    
+    return {
+      totalSessions: sessions.length,
+      upcomingSessions,
+      completedSessions
+    };
+  } catch (error) {
+    console.error('Error fetching user session stats: ', error);
+    return {
+      totalSessions: 0,
+      upcomingSessions: 0,
+      completedSessions: 0
+    };
+  }
+};
 export const getUserAllBookedSessions = async (userId: string): Promise<any[]> => {
   try {
     const therapistsSnapshot = await getDocs(collection(db, 'therapists'));
@@ -359,14 +472,14 @@ export const getUserAllBookedSessions = async (userId: string): Promise<any[]> =
 
 // Check if a user has a time conflict with an existing booking
 export const checkUserTimeConflict = (
-  userBookedSessions: any[], 
+  userBookedSessions: TherapistSession[], 
   newSessionDate: string, 
   newSessionStartTime: string, 
   newSessionDuration: number
 ): boolean => {
   const newSessionEndTime = calculateEndTimeFromSchedule(newSessionStartTime, newSessionDuration);
   
-  return userBookedSessions.some((bookedSession: any) => {
+  return userBookedSessions.some((bookedSession: TherapistSession) => {
     // Only check sessions on the same date
     if (bookedSession.date !== newSessionDate) return false;
     

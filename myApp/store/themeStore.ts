@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Theme = 'system' | 'light' | 'dark' | 'forest' | 'retro' | 'ocean' | 'blossom';
 
@@ -31,6 +33,8 @@ interface ThemeStore {
   selectedTheme: Theme;
   setSelectedTheme: (theme: Theme) => void;
   getThemePalette: (isDarkMode?: boolean) => ThemePalette;
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
 }
 
 const getThemePalette = (theme: Theme, isDarkMode: boolean = false): ThemePalette => {
@@ -404,14 +408,28 @@ const tailwindToRN = {
   'text-red-600': '#DC2626',
 };
 
-export const useThemeStore = create<ThemeStore>((set, get) => ({
-  selectedTheme: 'system',
-  setSelectedTheme: (theme: Theme) => set({ selectedTheme: theme }),
-  getThemePalette: (isDarkMode: boolean = false) => {
-    const { selectedTheme } = get();
-    return getThemePalette(selectedTheme, isDarkMode);
-  },
-}));
+export const useThemeStore = create<ThemeStore>()(
+  persist(
+    (set, get) => ({
+      selectedTheme: 'system',
+      _hasHydrated: false,
+      setSelectedTheme: (theme: Theme) => set({ selectedTheme: theme }),
+      setHasHydrated: (state: boolean) => set({ _hasHydrated: state }),
+      getThemePalette: (isDarkMode: boolean = false) => {
+        const { selectedTheme } = get();
+        return getThemePalette(selectedTheme, isDarkMode);
+      },
+    }),
+    {
+      name: 'theme-storage', // name of the item in the storage (must be unique)
+      storage: createJSONStorage(() => AsyncStorage), // (optional) by default, 'localStorage' is used
+      partialize: (state) => ({ selectedTheme: state.selectedTheme }), // only persist the selectedTheme
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);
 
 // Helper function to convert theme palette to React Native colors
 export const getThemeColors = (theme: Theme, isDarkMode: boolean = false) => {

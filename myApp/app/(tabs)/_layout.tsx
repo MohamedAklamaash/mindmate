@@ -3,7 +3,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { Ionicons,FontAwesome5  } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-
+import { BlurView } from "expo-blur";
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
@@ -46,28 +46,22 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: getTabBarActiveTintColor(), // Dynamic color based on theme
-        tabBarInactiveTintColor: '#6B7280', // Gray color for inactive tabs
+        tabBarInactiveTintColor: '#0c0c0dff', // Gray color for inactive tabs
         headerShown: false, // Remove the top header/title bar
-        tabBarButton: HapticTab,
+        //tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
+          backgroundColor: 'transparent', // Very subtle background
+          borderTopWidth: 0,
           height: Platform.OS === 'ios' ? 85 : 75,
           paddingBottom: Platform.OS === 'ios' ? 20 : 10,
           paddingTop: 6,
-          //marginBottom: 10, // Raise the tab bar above the bottom edge
-          //marginHorizontal: 16, // Add horizontal margin for floating effect
-          borderRadius: 30, // Rounded corners for floating look
-          //shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
           shadowRadius: 8,
           elevation: 8,
-          position: 'absolute',
-          left: 0,
-          right: 0,
+//          left: 0,
+  //        right: 0,
         },
       }}>
       <Tabs.Screen

@@ -36,7 +36,7 @@ async def test():
 async def chat_endpoint(req: ChatRequest):
     """Send a message to chatbot and get reply"""
     try:
-        reply_text = bot.reply(req.message)
+        reply_text = bot.get_reply(req.message)
         return ChatResponse(reply=reply_text)
     except Exception as e:
         print(f"Error in chat endpoint: {e}")

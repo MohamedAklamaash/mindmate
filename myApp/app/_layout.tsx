@@ -23,9 +23,11 @@ import QuestionNine from '@/components/ui/questions/QuestionNine';
 import QuestionTen from '@/components/ui/questions/QuestionTen';
 import TherapistQuestionScreen from '@/components/ui/questions/TherapistQuestion';
 import { useUserStore } from '@/store/userStore';
+import { useThemeStore } from '@/store/themeStore';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const hasHydrated = useThemeStore((state) => state._hasHydrated);
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -52,8 +54,8 @@ export default function RootLayout() {
 
   console.log('RootLayout render - userType:', userType);
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
+  // Wait for fonts to load and theme to hydrate before rendering
+  if (!loaded || !hasHydrated) {
     return null;
   }
 
