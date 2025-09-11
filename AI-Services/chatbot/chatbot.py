@@ -32,7 +32,7 @@ class ChatBot:
        
         # to identify it is first message or not if it is first message then we need to add the user info to the message
         self.chat.config['question_info'] = self.get_question_info()
-        self.initial_message=True
+        self.initial_message=False
 
     def classify_category(self, user_query: str, chat_history: Optional[List[Any]] = None) -> str:
         """Return the category label for a message and history."""
@@ -49,9 +49,14 @@ class ChatBot:
         user_query: str,
         chat_history: Optional[List[Any]] = None,
         memory: Any = None,
-        **kwargs,
+        **kwargs,useid
     ) -> str:
         """Generate a reply using specialised prompt, query, and optional memory."""
+        # use id vechu ._messages  fetch pannitu next thann invoke aa call pnnanum 
+
+        dict={1:{._messages: List[Dict[str, str]],.summary, name: }}
+
+
         self._messages.append({"user": user_query})
         if self.initial_message:
             self.initial_message = False
@@ -264,8 +269,8 @@ class ChatBot:
             self._previous_Insights = []
             self.initial_message = True
 
-    def get_question_info(self):
-        pass
+    def get_question_info(self,answers:List):
+
 
     def model_info(self) -> Dict:
         """Return underlying model metadata."""

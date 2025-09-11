@@ -1,15 +1,15 @@
 import os
 import sqlite3
-import shutil
 import json
-#import firebase_admin
-#from firebase_admin import credentials, firestore
+import shutil
+import firebase_admin
+from firebase_admin import credentials, firestore
 from typing import Dict, Any, List, Optional
 from structures import PersonalSummary, ConversationInsights
 import yaml
 from datetime import datetime
 
-class LocalDB:
+class ServerDB:
     def __init__(self, config_path: str):
         """
         Initialize LocalDB with config file path.
@@ -42,10 +42,11 @@ class LocalDB:
 
     def _setup_tables(self):
         cursor = self.conn.cursor()
-        # Table for summaries (single table, no distinction between personal/final)
+        # Table for summaries (now includes user_id)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS summaries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
                 summary TEXT,
                 insights TEXT,
                 timestamp TEXT
@@ -53,13 +54,13 @@ class LocalDB:
         ''')
         self.conn.commit()
 
-    def insert_summary(self, input: PersonalSummary):
+    def insert_summary(self, input: PersonalSummary, user_id: str):
         """
         Insert a record into `summaries` using an input that follows the
-        `PersonalSummary` structure (has fields `summary` and `insights`).
+        `PersonalSummary` structure (has fields `summary` and `insights`), and user_id.
 
         - Adds a `timestamp` field (ISO string)
-        - Persists into columns: (summary TEXT, insights TEXT, timestamp TEXT)
+        - Persists into columns: (user_id TEXT, summary TEXT, insights TEXT, timestamp TEXT)
         - Returns True if successful, False otherwise
         """
         try:
@@ -72,19 +73,19 @@ class LocalDB:
             cursor = self.conn.cursor()
             cursor.execute(
                 '''
-                INSERT INTO summaries (summary, insights, timestamp)
-                VALUES (?, ?, ?)
+                INSERT INTO summaries (user_id, summary, insights, timestamp)
+                VALUES (?, ?, ?, ?)
                 ''',
-                (payload["summary"], json.dumps(payload.get("insights", {})), timestamp_value)
+                (user_id, payload["summary"], json.dumps(payload.get("insights", {})), timestamp_value)
             )
             self.conn.commit()
             return True
         except Exception:
             return False
 
-    def get_summaries_last_n_days(self, days: int) -> List[PersonalSummary]:
+    def get_summaries_last_n_days(self, days: int, user_id: str) -> List[PersonalSummary]:
         """
-        Return a list of PersonalSummary for the last `days` days excluding today.
+        Return a list of PersonalSummary for the last `days` days excluding today for a specific user.
         Example: if today is Sep 5 and days=4, returns data from Sep 1 00:00
         up to (but not including) Sep 5 00:00, ordered from oldest to newest.
         """
@@ -104,10 +105,10 @@ class LocalDB:
             '''
             SELECT summary, insights, timestamp
             FROM summaries
-            WHERE timestamp >= ? AND timestamp < ?
+            WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
             ORDER BY timestamp ASC
             ''',
-            (start_iso, end_iso)
+            (user_id, start_iso, end_iso)
         )
         rows = cursor.fetchall()
 
@@ -122,10 +123,10 @@ class LocalDB:
             results.append(PersonalSummary(summary=summary_text or "", insights=insights_model))
 
         return results
-    
-    def delete_summaries_last_n_days(self, days: int) -> int:
+
+    def delete_summaries_last_n_days(self, days: int, user_id: str) -> int:
         """
-        Delete summaries from the last `days` days excluding today.
+        Delete summaries from the last `days` days excluding today for a specific user.
         Returns the number of rows deleted.
         """
         from datetime import datetime, timedelta
@@ -142,17 +143,17 @@ class LocalDB:
         cursor.execute(
             '''
             DELETE FROM summaries
-            WHERE timestamp >= ? AND timestamp < ?
+            WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
             ''',
-            (start_iso, end_iso)
+            (user_id, start_iso, end_iso)
         )
         deleted_count = cursor.rowcount
         self.conn.commit()
         return deleted_count
 
-    def delete_summaries_in_range(self, start_date: str, end_date: str) -> int:
+    def delete_summaries_in_range(self, start_date: str, end_date: str, user_id: str) -> int:
         """
-        Delete summaries between start_date and end_date (inclusive of the end day).
+        Delete summaries between start_date and end_date (inclusive of the end day) for a specific user.
         Input format: 'dd-mm-YYYY' (e.g., '01-09-2025').
         The function converts these to ISO timestamps at 00:00:00 and deletes in the
         range [start_date 00:00, (end_date + 1 day) 00:00).
@@ -172,51 +173,95 @@ class LocalDB:
         cursor.execute(
             '''
             DELETE FROM summaries
-            WHERE timestamp >= ? AND timestamp < ?
+            WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
             ''',
-            (start_iso, end_iso)
+            (user_id, start_iso, end_iso)
         )
         deleted_count = cursor.rowcount
         self.conn.commit()
         return deleted_count
 
 class CloudDB:
-    def __init__(self):
-        pass
+    def __init__(self, config_path: str):
+        """
+        Initialize Firestore using firebase-admin.
+        Reads Firebase config from config.yaml (uses projectId). If a service account
+        JSON is available via GOOGLE_APPLICATION_CREDENTIALS, it will be used.
+        """
+        self.config_path = config_path
+        with open(self.config_path, "r") as f:
+            config = yaml.safe_load(f)
+
+        firebase_cfg = (config or {}).get("firebase", {}) or {}
+        self.project_id = firebase_cfg.get("projectId")
+
+        # Initialize app if not already initialized
+        if not firebase_admin._apps:
+            cred: Optional[credentials.Base] = None
+            try:
+                # Prefer explicit service account via env var if present
+                cred = credentials.ApplicationDefault()
+            except Exception:
+                cred = None
+
+            if cred is not None:
+                firebase_admin.initialize_app(cred, {"projectId": self.project_id} if self.project_id else None)
+            else:
+                # Fall back to no credentials (use metadata server or emulator)
+                firebase_admin.initialize_app(options={"projectId": self.project_id} if self.project_id else None)
+
+        self.client = firestore.client()
+        self.collection_name = "summary"
+
+    def insert_summary(self, input: PersonalSummary, user_id: str) -> bool:
+        try:
+            if hasattr(input, "model_dump") and callable(getattr(input, "model_dump")):
+                payload = input.model_dump()
+            else:
+                payload = input.dict()
+
+            doc = {
+                "user_id": user_id,
+                "summary": payload.get("summary", ""),
+                "insights": payload.get("insights", {}),
+                "timestamp": payload.get("timestamp", None)
+            }
+            self.client.collection(self.collection_name).add(doc)
+            return True
+        except Exception:
+            return False
+
 class DB:
     def __init__(self, config_path: str):
         """
         Orchestrator DB that wires both LocalDB and CloudDB. Takes a config path
-        and initializes the local database using it. CloudDB is kept as a stub
-        per current requirements.
+        and initializes both databases.
         """
         self.config_path = config_path
-        self.local_db = LocalDB(config_path)
-        self.cloud_db = CloudDB()
+        self.local_db = ServerDB(config_path)
+        self.cloud_db = CloudDB(config_path)
 
-    def insert_local_summary(self, input: PersonalSummary) -> bool:
-        return self.local_db.insert_summary(input)
+    def insert_local_summary(self, input: PersonalSummary, user_id: str) -> bool:
+        return self.local_db.insert_summary(input, user_id)
 
-    def insert_cloud_summary(self, input: PersonalSummary):
-        pass
+    def retreive_local_summary(self, days: int, user_id: str) -> List[PersonalSummary]:
+        return self.local_db.get_summaries_last_n_days(days, user_id)
 
-    def retreive_local_summary(self, days: int) -> List[PersonalSummary]:
-        return self.local_db.get_summaries_last_n_days(days)
+    def to_cloud(self, days: int, user_id: str) -> int:
+        """
+        Upload the last `days` days (excluding today) of local summaries for `user_id`
+        into Firestore collection `summary`. Returns number of inserted documents.
+        """
+        summaries = self.local_db.get_summaries_last_n_days(days, user_id)
+        inserted = 0
+        for summary in summaries:
+            ok = self.cloud_db.insert_summary(summary, user_id)
+            if ok:
+                inserted += 1
+        return inserted
 
-    def retreive_cloud_summary(self, days: int):
-        pass
+    def delete_local_summary(self, start_date: str, end_date: str, user_id: str) -> int:
+        return self.local_db.delete_summaries_in_range(start_date, end_date, user_id)
 
-    def retrieve_cloud_info(self, *args, **kwargs):
-        pass
-
-    def local_to_cloud(self , *args, **kwargs):
-        pass
-    
-    def cloud_to_local(self, *args, **kwargs):
-        pass
-
-    def delete_local_summary(self, start_date: str, end_date: str) -> int:
-        return self.local_db.delete_summaries_in_range(start_date, end_date)
-
-    def delete_local_summary_days(self, days: int) -> int:
-        return self.local_db.delete_summaries_last_n_days(days)
+    def delete_local_summary_days(self, days: int, user_id: str) -> int:
+        return self.local_db.delete_summaries_last_n_days(days, user_id)

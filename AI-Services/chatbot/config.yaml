@@ -9,3 +9,10 @@ temperature: 0.7
 top_k: 40
 top_p: 1.0
 local_db_path: .cache/local_db.sqlite
+firebase:
+  apiKey: "AIzaSyA4u9wYxej-LbKAl7NIbEJTlrt5Y5a5Xvc"
+  authDomain: "mindmate-52779.firebaseapp.com"
+  projectId: "mindmate-52779"
+  storageBucket: "mindmate-52779.firebasestorage.app"
+  messagingSenderId: "772843818203"
+  appId: "1:772843818203:android:95a264b8688342602bd0fe"

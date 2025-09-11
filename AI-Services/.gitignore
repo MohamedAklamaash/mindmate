@@ -4,6 +4,7 @@
 **/.env.*
 chatbot/test.py
 chatbot/test2.py
+chatbot/test3.py
 chatbot/*.md
 chatbot/CHATBOT_FLOW.md
 __pycache__/
