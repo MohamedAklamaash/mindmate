@@ -72,3 +72,7 @@ async def hard_reset():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
+# Export app for Vercel
+# This is the ASGI application that Vercel will use
+handler = app
