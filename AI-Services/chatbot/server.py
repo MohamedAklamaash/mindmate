@@ -7,8 +7,11 @@ import yaml
 
 # Load config
 cfg_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-with open(cfg_path, "r") as f:
-    cfg = yaml.safe_load(f)
+try:
+    with open(cfg_path, "r") as f:
+        cfg = yaml.safe_load(f)
+except Exception:
+    cfg = {}
 
 bot = ChatBot(cfg_path)
 

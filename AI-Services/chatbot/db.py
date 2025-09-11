@@ -23,13 +23,21 @@ class LocalDB:
             config = yaml.safe_load(f)
         self.local_db_path = config.get("local_db_path", ".cache/local_db.sqlite")
 
-        # Ensure the directory for the database exists
+        # Ensure the directory for the database exists, falling back to /tmp on read-only FS (e.g., Vercel)
         db_dir = os.path.dirname(self.local_db_path)
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
+        try:
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(db_dir, exist_ok=True)
+            target_db_path = self.local_db_path
+        except Exception:
+            # Read-only or permission error → use /tmp which is writable in serverless
+            fallback_dir = os.path.join("/tmp", "mindmate")
+            os.makedirs(fallback_dir, exist_ok=True)
+            target_db_path = os.path.join(fallback_dir, "local_db.sqlite")
+            self.local_db_path = target_db_path
 
         # Connect to SQLite database
-        self.conn = sqlite3.connect(self.local_db_path)
+        self.conn = sqlite3.connect(target_db_path)
         self._setup_tables()
 
     def _setup_tables(self):
