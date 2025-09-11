@@ -122,7 +122,7 @@ export default function ChatScreen() {
 
     try {
       console.log("Sending message to server:", userMsg);
-      const res = await fetch("http://192.168.0.92:8000/chat", {
+      const res = await fetch("https://mind-mate-delta.vercel.app/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg }),
