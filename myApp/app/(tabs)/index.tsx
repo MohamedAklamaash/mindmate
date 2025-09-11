@@ -610,6 +610,12 @@ export default function HomeScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.headerSection}>
+                <Pressable 
+                  style={[styles.sidebarToggle, { backgroundColor: themeColors.surface }]}
+                  onPress={openSidebar}
+                >
+                  <MaterialCommunityIcons name="menu" size={24} color={themeColors.primary} />
+                </Pressable>
                 <LinearGradient colors={iconGradientColors} style={styles.iconContainer}>
                   <MaterialCommunityIcons name="account-tie" size={40} color="white" />
                 </LinearGradient>
@@ -673,6 +679,17 @@ export default function HomeScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
+        <Sidebar 
+          isOpen={isSidebarOpen}
+          sidebarAnimation={sidebarAnimation}
+          closeSidebar={closeSidebar}
+          user={user}
+          selectedTheme={selectedTheme}
+          setSelectedTheme={setSelectedTheme}
+          isThemeDropdownOpen={isThemeDropdownOpen}
+          setIsThemeDropdownOpen={setIsThemeDropdownOpen}
+          sidebarWidth={sidebarWidth}
+        />
       </LinearGradient>
     );
   }
