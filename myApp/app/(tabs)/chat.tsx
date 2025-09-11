@@ -368,10 +368,10 @@ export default function ChatScreen() {
               if (result.success) {
                 console.log("Hard reset completed successfully");
                 // Optionally show a success message
-                setMessages([{ 
-                  role: "system", 
-                  text: "✅ Chat history has been reset and saved." 
-                }]);
+                //setMessages([{ 
+                  //role: "system", 
+                  //text: "✅ Chat history has been reset and saved." 
+                //}]);
               } else {
                 console.error("Hard reset failed:", result.error);
                 // Show error message but keep the UI cleared

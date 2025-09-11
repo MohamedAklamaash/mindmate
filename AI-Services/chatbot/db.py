@@ -2,8 +2,8 @@ import os
 import sqlite3
 import shutil
 import json
-import firebase_admin
-from firebase_admin import credentials, firestore
+#import firebase_admin
+#from firebase_admin import credentials, firestore
 from typing import Dict, Any, List, Optional
 from structures import PersonalSummary, ConversationInsights
 import yaml
