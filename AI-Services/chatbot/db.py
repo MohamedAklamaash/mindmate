@@ -172,13 +172,9 @@ class LocalDB:
         self.conn.commit()
         return deleted_count
 
-
 class CloudDB:
-
-
-
-
-
+    def __init__(self):
+        pass
 class DB:
     def __init__(self, config_path: str):
         """

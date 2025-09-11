@@ -6,4 +6,8 @@ chatbot/test.py
 chatbot/test2.py
 chatbot/*.md
 chatbot/CHATBOT_FLOW.md
+__pycache__/
+**/__pycache__/
+*.pyc
+
 # Ignore any file or folder named .env anywhere

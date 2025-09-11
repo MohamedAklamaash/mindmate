@@ -264,7 +264,7 @@ class ChatBot:
             self._previous_Insights = []
             self.initial_message = True
 
-    def get_question_info():
+    def get_question_info(self):
         pass
 
     def model_info(self) -> Dict:
