@@ -1,6 +1,6 @@
 // ChatScreen.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated, Platform, KeyboardAvoidingView } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Animated, Platform, KeyboardAvoidingView, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -15,6 +15,7 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const router = useRouter();
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // Theme support
   const selectedTheme = useThemeStore((state) => state.selectedTheme);
@@ -342,57 +343,49 @@ export default function ChatScreen() {
   };
 
   // Handle Reset Button Press
-  const handleReset = async () => {
-    Alert.alert(
-      "Confirm Hard Reset",
-      "Are you sure you want to hard reset?",
-      [
-        {
-          text: "No",
-          onPress: () => console.log("Hard reset cancelled"),
-          style: "cancel"
-        },
-        {
-          text: "Yes",
-          onPress: async () => {
-            try {
-              console.log("Triggering hard reset...");
-              
-              // Clear local state immediately for better UX
-              setMessages([]);
-              setInput("");
-              
-              // Call the server to perform hard reset
-              const result = await HardResetHandler.triggerHardReset();
-              
-              if (result.success) {
-                console.log("Hard reset completed successfully");
-                // Optionally show a success message
-                //setMessages([{ 
-                  //role: "system", 
-                  //text: "✅ Chat history has been reset and saved." 
-                //}]);
-              } else {
-                console.error("Hard reset failed:", result.error);
-                // Show error message but keep the UI cleared
-                setMessages([{ 
-                  role: "system", 
-                  text: "⚠️ Reset completed locally, but server sync failed. Please check your connection." 
-                }]);
-              }
-            } catch (error) {
-              console.error("Error during reset:", error);
-              // Show error message but keep the UI cleared
-              setMessages([{ 
-                role: "system", 
-                text: "⚠️ Reset completed locally, but server sync failed. Please check your connection." 
-              }]);
-            }
-          }
-        }
-      ],
-      { cancelable: false }
-    );
+  const handleReset = () => {
+    setShowResetModal(true);
+  };
+
+  const handleCancelReset = () => {
+    setShowResetModal(false);
+  };
+
+  const handleConfirmReset = async () => {
+    setShowResetModal(false);
+    try {
+      console.log("Triggering hard reset...");
+      
+      // Clear local state immediately for better UX
+      setMessages([]);
+      setInput("");
+      
+      // Call the server to perform hard reset
+      const result = await HardResetHandler.triggerHardReset();
+      
+      if (result.success) {
+        console.log("Hard reset completed successfully");
+        // Optionally show a success message
+        //setMessages([{ 
+          //role: "system", 
+          //text: "✅ Chat history has been reset and saved." 
+        //}]);
+      } else {
+        console.error("Hard reset failed:", result.error);
+        // Show error message but keep the UI cleared
+        setMessages([{ 
+          role: "system", 
+          text: "⚠️ Reset completed locally, but server sync failed. Please check your connection." 
+        }]);
+      }
+    } catch (error) {
+      console.error("Error during reset:", error);
+      // Show error message but keep the UI cleared
+      setMessages([{ 
+        role: "system", 
+        text: "⚠️ Reset completed locally, but server sync failed. Please check your connection." 
+      }]);
+    }
   };
 
   return (
@@ -546,6 +539,37 @@ export default function ChatScreen() {
           </View>
         </View>
       )}
+
+      {/* Custom Reset Confirmation Modal */}
+      <Modal
+        visible={showResetModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelReset}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: themeColors.surface }]}>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Confirm Hard Reset</Text>
+            <Text style={[styles.modalMessage, { color: themeColors.textSecondary }]}>
+              Are you sure you want to hard reset? This will clear all chat history.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelModalButton, { borderColor: themeColors.border }]}
+                onPress={handleCancelReset}
+              >
+                <Text style={[styles.modalButtonText, { color: themeColors.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmModalButton, { backgroundColor: getAccentColor() }]}
+                onPress={handleConfirmReset}
+              >
+                <Text style={[styles.modalButtonText, { color: '#fff' }]}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
     </KeyboardAvoidingView>
   );
@@ -784,6 +808,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "80%",
+    padding: 20,
+    borderRadius: 12,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalMessage: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    marginHorizontal: 5,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelModalButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+  },
+  confirmModalButton: {
+    // Background color set dynamically
+  },
+  modalButtonText: {
     fontSize: 16,
     fontWeight: "500",
   },
