@@ -32,12 +32,14 @@ type UserStore = {
   hydrated: boolean;
   needsNickname: boolean;
   onboardingStage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen';
+  u_id: string | null; // Persistent user ID from Firestore
   setUserType: (type: 'user' | 'therapist') => void;
   setUser: (user: User | null) => void;
   setAuthenticated: (isAuthenticated: boolean) => void;
   setNeedsNickname: (needs: boolean) => void;
   setOnboardingStage: (stage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
   setUserFirestoreId: (firestoreId: string) => void; // Add method to set Firestore ID
+  setUserId: (u_id: string) => void; // Add method to set persistent user ID
   signOut: () => void;
 };
 
@@ -51,6 +53,7 @@ export const useUserStore = create<UserStore>()(
       hydrated: false,
       needsNickname: false,
       onboardingStage: 'none',
+      u_id: null,
       setUserType: (type) => set({ userType: type }),
       setUser: (user) => set({ user }),
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
@@ -59,7 +62,8 @@ export const useUserStore = create<UserStore>()(
       setUserFirestoreId: (firestoreId) => set((state) => ({ 
         user: state.user ? { ...state.user, firestoreId } : null 
       })),
-      signOut: () => set({ user: null, isAuthenticated: false }),
+      setUserId: (u_id) => set({ u_id }),
+      signOut: () => set({ user: null, isAuthenticated: false, u_id: null }),
     }),
     {
       name: 'user-storage',

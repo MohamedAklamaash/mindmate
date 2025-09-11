@@ -8,6 +8,7 @@ export const AppExitHandler = {
   triggerAppExit: async () => {
     try {
       const serverUrl = "https://mind-mate-delta.vercel.app"; 
+      console.log('App exit processed: Triggering endpoint call.');
 
       const response = await fetch(`${serverUrl}/app-exit`, {
         method: 'GET',
