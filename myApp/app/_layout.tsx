@@ -24,6 +24,7 @@ import QuestionTen from '@/components/ui/questions/QuestionTen';
 import TherapistQuestionScreen from '@/components/ui/questions/TherapistQuestion';
 import { useUserStore } from '@/store/userStore';
 import { useThemeStore } from '@/store/themeStore';
+import { AppExitTrigger } from '@/services/triggerer';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -131,6 +132,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <AppExitTrigger />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />

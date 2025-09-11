@@ -1,5 +1,5 @@
 import React, { useEffect, useState, memo } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, Alert, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Animated } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, Alert, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,6 +16,7 @@ type SidebarProps = {
   setSelectedTheme: (theme: Theme) => void;
   isThemeDropdownOpen: boolean;
   setIsThemeDropdownOpen: (open: boolean) => void;
+  sidebarWidth: number;
 };
 
 const Sidebar = memo(function Sidebar({
@@ -27,6 +28,7 @@ const Sidebar = memo(function Sidebar({
   setSelectedTheme,
   isThemeDropdownOpen,
   setIsThemeDropdownOpen,
+  sidebarWidth,
 }: SidebarProps) {
   const themes: Theme[] = ['system', 'light', 'dark', 'forest', 'retro', 'ocean', 'blossom'];
 
@@ -45,6 +47,7 @@ const Sidebar = memo(function Sidebar({
           style={[
             styles.sidebarContainer,
             {
+              width: sidebarWidth,
               transform: [{ translateX: sidebarAnimation }]
             }
           ]}
@@ -243,7 +246,12 @@ export default function HomeScreen() {
   
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const sidebarAnimation = useState(new Animated.Value(-320))[0]; // Start off-screen to the left
+  
+  // Calculate responsive sidebar width (half of screen width)
+  const screenWidth = Dimensions.get('window').width;
+  const sidebarWidth = screenWidth * 0.5;
+  
+  const sidebarAnimation = useState(new Animated.Value(-sidebarWidth))[0]; // Start off-screen to the left
 
   // Fetch therapist's existing data when component mounts
   useEffect(() => {
@@ -504,7 +512,7 @@ export default function HomeScreen() {
 
   const closeSidebar = () => {
     Animated.timing(sidebarAnimation, {
-      toValue: -320,
+      toValue: -sidebarWidth,
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
@@ -954,6 +962,7 @@ export default function HomeScreen() {
           setSelectedTheme={setSelectedTheme}
           isThemeDropdownOpen={isThemeDropdownOpen}
           setIsThemeDropdownOpen={setIsThemeDropdownOpen}
+          sidebarWidth={sidebarWidth}
         />
       </SafeAreaView>
     </LinearGradient>
@@ -1507,7 +1516,6 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   sidebarContainer: {
-    width: 320,
     height: '100%',
     backgroundColor: 'white',
     position: 'absolute',

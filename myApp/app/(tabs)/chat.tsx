@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import { useThemeStore, getThemeColors } from '@/store/themeStore';
+import { HardResetHandler } from '@/services/triggerer';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
@@ -340,6 +341,60 @@ export default function ChatScreen() {
     }
   };
 
+  // Handle Reset Button Press
+  const handleReset = async () => {
+    Alert.alert(
+      "Confirm Hard Reset",
+      "Are you sure you want to hard reset?",
+      [
+        {
+          text: "No",
+          onPress: () => console.log("Hard reset cancelled"),
+          style: "cancel"
+        },
+        {
+          text: "Yes",
+          onPress: async () => {
+            try {
+              console.log("Triggering hard reset...");
+              
+              // Clear local state immediately for better UX
+              setMessages([]);
+              setInput("");
+              
+              // Call the server to perform hard reset
+              const result = await HardResetHandler.triggerHardReset();
+              
+              if (result.success) {
+                console.log("Hard reset completed successfully");
+                // Optionally show a success message
+                setMessages([{ 
+                  role: "system", 
+                  text: "✅ Chat history has been reset and saved." 
+                }]);
+              } else {
+                console.error("Hard reset failed:", result.error);
+                // Show error message but keep the UI cleared
+                setMessages([{ 
+                  role: "system", 
+                  text: "⚠️ Reset completed locally, but server sync failed. Please check your connection." 
+                }]);
+              }
+            } catch (error) {
+              console.error("Error during reset:", error);
+              // Show error message but keep the UI cleared
+              setMessages([{ 
+                role: "system", 
+                text: "⚠️ Reset completed locally, but server sync failed. Please check your connection." 
+              }]);
+            }
+          }
+        }
+      ],
+      { cancelable: false }
+    );
+  };
+
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1 }}
@@ -440,10 +495,7 @@ export default function ChatScreen() {
           
           <TouchableOpacity 
             style={[styles.actionButton, styles.resetButton, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
-            onPress={() => {
-              setMessages([]);
-              setInput("");
-            }}
+            onPress={handleReset}
           >
             <Ionicons name="refresh" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>

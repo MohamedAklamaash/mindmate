@@ -47,6 +47,26 @@ async def model_info():
     """Get chatbot model info"""
     return bot.model_info()
 
+@app.get("/app-exit")
+async def app_exit():
+    """Handle app exit - summarize and store conversation data"""
+    try:
+        bot.app_exit()
+        return {"status": "App exit processed successfully", "timestamp": str(datetime.now())}
+    except Exception as e:
+        print(f"Error in app exit endpoint: {e}")
+        return {"status": "Error during app exit", "error": str(e), "timestamp": str(datetime.now())}
+
+@app.get("/hard-reset")
+async def hard_reset():
+    """Handle hard reset - save conversation to DB and clear all data"""
+    try:
+        bot.hard_reset()
+        return {"status": "Hard reset completed successfully", "timestamp": str(datetime.now())}
+    except Exception as e:
+        print(f"Error in hard reset endpoint: {e}")
+        return {"status": "Error during hard reset", "error": str(e), "timestamp": str(datetime.now())}
+
 
 # Hosting code
 if __name__ == "__main__":
