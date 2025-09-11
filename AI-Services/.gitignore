@@ -9,5 +9,6 @@ chatbot/CHATBOT_FLOW.md
 __pycache__/
 **/__pycache__/
 *.pyc
+.cache/
 
 # Ignore any file or folder named .env anywhere
