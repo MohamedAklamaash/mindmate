@@ -11,6 +11,10 @@ PyYAML>=6.0
 # Firebase Admin SDK
 firebase-admin>=6.5.0
 
+# FastAPI web framework and ASGI server
+fastapi>=0.111.0
+uvicorn>=0.30.0
+
 # Standard library imports (no installation needed):
 # - typing
 # - datetime
