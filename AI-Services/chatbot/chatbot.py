@@ -55,7 +55,7 @@ class ChatBot:
         self._messages.append({"user": user_query})
         if self.initial_message:
             self.initial_message = False
-            specialised_prompt = ""
+            specialised_prompt = 
             analysis_input = Analysis(
                 user_query=user_query,
                 specialised_prompt=specialised_prompt,
