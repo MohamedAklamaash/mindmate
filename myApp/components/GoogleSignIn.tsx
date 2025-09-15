@@ -33,6 +33,8 @@ export function GoogleSignIn() {
       GoogleSignin.configure({
         webClientId: WEB_ID || undefined,
         offlineAccess: false,
+        scopes: ['email', 'profile'], // Ensure email scope is requested
+        forceCodeForRefreshToken: true, // Add this for better token handling
       });
     }, []);
 
@@ -46,13 +48,19 @@ export function GoogleSignIn() {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           const profile = await res.json();
+          
+          // Store user data with email from Google response
           setUser({
             id: profile.sub ?? String(Date.now()),
-            email: profile.email ?? null,
+            email: profile.email ?? null, // This will capture the Google email
             name: profile.name ?? null,
             photoURL: profile.picture ?? null,
           });
-          // Collect nickname next
+          
+          console.log('Google sign-in successful, email:', profile.email); // Debug log
+          
+          // Set user type and proceed to onboarding
+          setUserType('user');
           setAuthenticated(false);
           setNeedsNickname(true);
         } catch (e) {
@@ -87,17 +95,20 @@ export function GoogleSignIn() {
           {
             text: 'Continue',
             onPress: () => {
-              // Create a demo user
+              // Create a demo user with email
               setUser({
                 id: String(Date.now()),
-                email: 'demo@wittymate.com',
+                email: 'demo@wittymate.com', // Demo email
                 name: 'Demo User',
                 photoURL: null,
               });
-              // In demo mode, go straight to the welcome screen
-              setAuthenticated(true);
-              setNeedsNickname(false);
-              router.replace('/(tabs)');
+              
+              console.log('Demo mode email:', 'demo@wittymate.com'); // Debug log
+              
+              // Set user type and proceed to onboarding
+              setUserType('user');
+              setAuthenticated(false);
+              setNeedsNickname(true);
               setLoading(false);
             },
           },
@@ -110,6 +121,25 @@ export function GoogleSignIn() {
     }
   };
 
+  // Add this helper function before openGoogleSetupInstructions
+  const getUserInfoFromIdToken = async (idToken: string) => {
+    try {
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      const tokenInfo = await response.json();
+      console.log('Token info response:', tokenInfo);
+      
+      return {
+        email: tokenInfo.email,
+        name: tokenInfo.name,
+        picture: tokenInfo.picture,
+        sub: tokenInfo.sub
+      };
+    } catch (error) {
+      console.error('Error getting user info from ID token:', error);
+      return null;
+    }
+  };
+
   const openGoogleSetupInstructions = async () => {
     if (!ANDROID_ID) {
       // Fallback to Google Play Services sign-in using google-services.json
@@ -117,23 +147,90 @@ export function GoogleSignIn() {
         setLoading(true);
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
         const result = (await GoogleSignin.signIn()) as any;
-        const profile = result?.user ?? result;
+        
+        // Debug the full result structure
+        console.log('Full Google sign-in result:', JSON.stringify(result, null, 2));
+        
+        // Extract user data from different possible structures
+        let profile;
+        if (result?.user) {
+          profile = result.user;
+        } else if (result?.data?.user) {
+          profile = result.data.user;
+        } else {
+          profile = result;
+        }
+        
+        console.log('Extracted profile:', JSON.stringify(profile, null, 2));
+        
+        // Extract email from various possible locations
+        let email = profile?.email || 
+                   profile?.user?.email || 
+                   result?.data?.user?.email ||
+                   result?.user?.email ||
+                   null;
+        
+        // If email is still not found, try using ID token
+        if (!email && (result?.idToken || result?.data?.idToken)) {
+          const idToken = result?.idToken || result?.data?.idToken;
+          console.log('Trying to get email from ID token...');
+          const tokenInfo = await getUserInfoFromIdToken(idToken);
+          if (tokenInfo) {
+            email = tokenInfo.email;
+            profile = {
+              ...profile,
+              email: tokenInfo.email,
+              name: profile?.name || tokenInfo.name,
+              photo: profile?.photo || tokenInfo.picture,
+              id: profile?.id || tokenInfo.sub
+            };
+          }
+        }
+        
+        console.log('Final extracted email:', email);
+        
+        // Store user data with email from native Google sign-in
         setUser({
-          id: profile.id || String(Date.now()),
-          email: profile.email || null,
-          name: profile.name || null,
-          photoURL: (profile.photo as any) || null,
+          id: profile?.id || profile?.user?.id || String(Date.now()),
+          email: email,
+          name: profile?.name || profile?.user?.name || profile?.givenName || null,
+          photoURL: profile?.photo || profile?.user?.photo || null,
         });
+        
+        console.log('Native Google sign-in successful, final email:', email);
+        
+        if (!email) {
+          Alert.alert(
+            'Email Required',
+            'We need your email address to create your account. Please make sure you select an account with an email address.',
+            [{ text: 'OK' }]
+          );
+          setLoading(false);
+          return;
+        }
+        
+        // Set user type and proceed to onboarding
+        setUserType('user');
         setAuthenticated(false);
         setNeedsNickname(true);
-      } catch (e) {
+      } catch (e: any) {
         console.error('GoogleSignIn (native) failed', e);
-        Alert.alert('Error', 'Failed to sign in with Google on device');
+        
+        // Check if it's a sign-in cancellation
+        if (e.code === 'SIGN_IN_CANCELLED') {
+          console.log('User cancelled Google sign-in');
+        } else if (e.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+          Alert.alert('Error', 'Google Play Services not available on this device');
+        } else {
+          Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
       return;
     }
+    
+    // For web/expo auth session
     try {
       setLoading(true);
       await promptAsync();

@@ -48,6 +48,8 @@ export interface TherapistSession {
 // Save user data with onboarding answers to Firestore
 export const saveUserWithAnswers = async (userData: Omit<UserData, 'id' | 'createdAt' | 'updatedAt'>, answers: QuestionAnswers): Promise<string> => {
   try {
+    console.log('Saving user with email to Firestore:', userData.email); // Debug log
+    
     const userDocData: UserData = {
       ...userData,
       onboardingAnswers: answers,
@@ -55,8 +57,10 @@ export const saveUserWithAnswers = async (userData: Omit<UserData, 'id' | 'creat
       updatedAt: serverTimestamp(),
     };
 
+    console.log('Complete user document data:', userDocData); // Debug log
+
     const docRef = await addDoc(collection(db, 'users'), userDocData);
-    console.log('User document written with ID: ', docRef.id);
+    console.log('User document written with ID and email: ', docRef.id, userData.email);
     return docRef.id;
   } catch (error) {
     console.error('Error adding user document: ', error);
@@ -67,12 +71,14 @@ export const saveUserWithAnswers = async (userData: Omit<UserData, 'id' | 'creat
 // Update existing user with onboarding answers
 export const updateUserAnswers = async (userId: string, answers: QuestionAnswers): Promise<void> => {
   try {
+    console.log('Updating user answers for user ID:', userId); // Debug log
+    
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, {
       onboardingAnswers: answers,
       updatedAt: serverTimestamp(),
     });
-    console.log('User answers updated successfully');
+    console.log('User answers updated successfully for user:', userId);
   } catch (error) {
     console.error('Error updating user answers: ', error);
     throw error;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,13 @@ import {
   Pressable,
   Linking,
   Alert,
-  Modal,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useThemeStore, getThemeColors } from '@/store/themeStore';
+import { spotifyService, PodcastData } from '@/services/spotifyService';
+import { appInitializationService } from '@/services/appInitialization';
 
 interface Course {
   id: string;
@@ -44,11 +45,9 @@ interface QuickTip {
   };
 }
 
-type ContextType = 'general' | 'stress' | 'anxiety' | 'depression' | 'motivation' | 'sleep' | 'confidence';
-
 export default function ResourcesScreen() {
-  const [isTopicsDropdownOpen, setIsTopicsDropdownOpen] = useState(false);
-  const [currentContext, setCurrentContext] = useState<ContextType>('general');
+  const [spotifyPodcasts, setSpotifyPodcasts] = useState<PodcastData[]>([]);
+  const [podcastLoading, setPodcastLoading] = useState(false);
   
   // Theme support
   const selectedTheme = useThemeStore((state) => state.selectedTheme);
@@ -108,144 +107,65 @@ export default function ResourcesScreen() {
     },
   ];
 
-  const quickTipsByContext: Record<ContextType, QuickTip> = {
-    general: {
-      quote: {
-        text: "The greatest revolution of our generation is the discovery that human beings, by changing the inner attitudes of their minds, can change the outer aspects of their lives.",
-        author: "William James"
-      },
-      article: {
-        title: "5 Simple Daily Habits for Better Mental Health",
-        source: "Psychology Today",
-        url: "https://www.psychologytoday.com/mental-health-habits"
-      },
-      podcast: {
-        title: "The Science of Happiness",
-        host: "Dr. Laurie Santos",
-        duration: "25 min",
-        spotifyUrl: "https://open.spotify.com/show/happiness"
-      }
+  // Static health-focused content
+  const currentTip: QuickTip = {
+    quote: {
+      text: "The greatest revolution of our generation is the discovery that human beings, by changing the inner attitudes of their minds, can change the outer aspects of their lives.",
+      author: "William James"
     },
-    stress: {
-      quote: {
-        text: "You have been assigned this mountain to show others it can be moved.",
-        author: "Mel Robbins"
-      },
-      article: {
-        title: "10 Effective Stress Management Techniques",
-        source: "Harvard Health",
-        url: "https://www.health.harvard.edu/stress-management"
-      },
-      podcast: {
-        title: "Stress Less with Dr. Mark Hyman",
-        host: "Dr. Mark Hyman",
-        duration: "30 min",
-        spotifyUrl: "https://open.spotify.com/show/stress-less"
-      }
+    article: {
+      title: "5 Simple Daily Habits for Better Mental Health",
+      source: "Psychology Today",
+      url: "https://www.psychologytoday.com/mental-health-habits"
     },
-    anxiety: {
-      quote: {
-        text: "Anxiety is the dizziness of freedom.",
-        author: "Søren Kierkegaard"
-      },
-      article: {
-        title: "Understanding and Managing Anxiety",
-        source: "Mayo Clinic",
-        url: "https://www.mayoclinic.org/anxiety"
-      },
-      podcast: {
-        title: "The Anxiety Guy Podcast",
-        host: "Dennis Simsek",
-        duration: "35 min",
-        spotifyUrl: "https://open.spotify.com/show/anxiety-guy"
-      }
-    },
-    depression: {
-      quote: {
-        text: "Even the darkest night will end and the sun will rise.",
-        author: "Victor Hugo"
-      },
-      article: {
-        title: "Breaking Through Depression",
-        source: "Mental Health America",
-        url: "https://www.mhanational.org/depression"
-      },
-      podcast: {
-        title: "Depression and Bipolar Support",
-        host: "DBSA",
-        duration: "40 min",
-        spotifyUrl: "https://open.spotify.com/show/dbsa"
-      }
-    },
-    motivation: {
-      quote: {
-        text: "The only impossible journey is the one you never begin.",
-        author: "Tony Robbins"
-      },
-      article: {
-        title: "Building Lasting Motivation",
-        source: "Forbes",
-        url: "https://www.forbes.com/motivation"
-      },
-      podcast: {
-        title: "Motivation Daily",
-        host: "Motivation Ark",
-        duration: "20 min",
-        spotifyUrl: "https://open.spotify.com/show/motivation-daily"
-      }
-    },
-    sleep: {
-      quote: {
-        text: "Sleep is the best meditation.",
-        author: "Dalai Lama"
-      },
-      article: {
-        title: "The Science of Better Sleep",
-        source: "Sleep Foundation",
-        url: "https://www.sleepfoundation.org"
-      },
-      podcast: {
-        title: "Sleep With Me",
-        host: "Drew Ackerman",
-        duration: "60 min",
-        spotifyUrl: "https://open.spotify.com/show/sleep-with-me"
-      }
-    },
-    confidence: {
-      quote: {
-        text: "Believe you can and you're halfway there.",
-        author: "Theodore Roosevelt"
-      },
-      article: {
-        title: "Building Self-Confidence",
-        source: "Psychology Today",
-        url: "https://www.psychologytoday.com/confidence"
-      },
-      podcast: {
-        title: "The Confidence Code",
-        host: "Kay & Claire",
-        duration: "45 min",
-        spotifyUrl: "https://open.spotify.com/show/confidence-code"
-      }
+    podcast: {
+      title: "The Science of Happiness",
+      host: "Dr. Laurie Santos",
+      duration: "25 min",
+      spotifyUrl: "https://open.spotify.com/show/happiness"
     }
   };
 
-  const topics = [
-    { key: 'general' as ContextType, label: 'General Wellness', icon: '💚' },
-    { key: 'stress' as ContextType, label: 'Stress Relief', icon: '🧘' },
-    { key: 'anxiety' as ContextType, label: 'Anxiety Support', icon: '💙' },
-    { key: 'depression' as ContextType, label: 'Mood Boost', icon: '🌟' },
-    { key: 'motivation' as ContextType, label: 'Motivation', icon: '🚀' },
-    { key: 'sleep' as ContextType, label: 'Better Sleep', icon: '😴' },
-    { key: 'confidence' as ContextType, label: 'Self-Confidence', icon: '💪' }
-  ];
-
-  const currentTip = quickTipsByContext[currentContext];
-
-  const updateQuickTips = (context: ContextType) => {
-    setCurrentContext(context);
-    setIsTopicsDropdownOpen(false);
+  // Fetch health podcast data from Spotify
+  const fetchHealthPodcastData = async () => {
+    setPodcastLoading(true);
+    try {
+      const podcasts = await spotifyService.searchHealthPodcasts();
+      setSpotifyPodcasts(podcasts);
+    } catch (error) {
+      console.error('Failed to fetch podcast data:', error);
+      // Show user-friendly error message
+      Alert.alert(
+        'Podcast Loading Error',
+        'Unable to load latest podcast recommendations. Showing default content.',
+        [{ text: 'OK' }]
+      );
+      // Reset to empty array so fallback content is shown
+      setSpotifyPodcasts([]);
+    } finally {
+      setPodcastLoading(false);
+    }
   };
+
+  // Initialize app and load health podcast data on component mount
+  useEffect(() => {
+    const initializeAndFetch = async () => {
+      try {
+        // Initialize background services first
+        await appInitializationService.initializeApp();
+        console.log('App services initialized, fetching podcasts...');
+        
+        // Then fetch podcast data
+        await fetchHealthPodcastData();
+      } catch (error) {
+        console.error('Failed to initialize app or fetch podcasts:', error);
+        // Still try to fetch podcasts even if initialization fails
+        await fetchHealthPodcastData();
+      }
+    };
+
+    initializeAndFetch();
+  }, []);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -343,61 +263,11 @@ export default function ResourcesScreen() {
           {/* Quick Tips Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Quick Tips</Text>
-              <View style={styles.topicsContainer}>
-                {currentContext !== 'general' && (
-                  <View style={[styles.badge, { backgroundColor: themeColors.accent }]}>
-                    <Text style={[styles.badgeText, { color: themeColors.accentText }]}>
-                      {currentContext.charAt(0).toUpperCase() + currentContext.slice(1)} Support
-                    </Text>
-                  </View>
-                )}
-                <Pressable 
-                  style={[styles.dropdownButton, { borderColor: themeColors.border }]}
-                  onPress={() => setIsTopicsDropdownOpen(true)}
-                >
-                  <Text style={[styles.dropdownButtonText, { color: themeColors.textSecondary }]}>Explore Topics</Text>
-                  <MaterialCommunityIcons 
-                    name="chevron-down"
-                    size={16} 
-                    color={themeColors.textMuted} 
-                  />
-                </Pressable>
-              </View>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Health & Wellness Tips</Text>
             </View>
 
-            <Modal
-              transparent={true}
-              visible={isTopicsDropdownOpen}
-              animationType="fade"
-              onRequestClose={() => setIsTopicsDropdownOpen(false)}
-            >
-              <Pressable style={styles.modalOverlay} onPress={() => setIsTopicsDropdownOpen(false)}>
-                <View style={styles.dropdown}>
-                  {topics.map((topic) => (
-                    <Pressable
-                      key={topic.key}
-                      style={[
-                        styles.topicItem,
-                        currentContext === topic.key && styles.topicItemActive
-                      ]}
-                      onPress={() => updateQuickTips(topic.key)}
-                    >
-                      <Text style={styles.topicIcon}>{topic.icon}</Text>
-                      <Text style={[
-                        styles.topicLabel,
-                        currentContext === topic.key && styles.topicLabelActive
-                      ]}>
-                        {topic.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </Pressable>
-            </Modal>
-
             {/* Daily Inspiration */}
-            <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+            <View style={[styles.card, { backgroundColor: themeColors.surface}]}>
               <View style={styles.cardHeader}>
                 <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#D1FAE5' : '#EEF2FF' }]}>
                   <MaterialCommunityIcons 
@@ -436,29 +306,80 @@ export default function ResourcesScreen() {
               </View>
             </View>
 
-            {/* Podcast Recommendation */}
+            {/* Podcast Recommendations Carousel */}
             <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
               <View style={styles.cardHeader}>
                 <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#DCFCE7' : '#D1FAE5' }]}>
-                  <MaterialCommunityIcons 
-                    name="volume-high" 
-                    size={20} 
-                    color={selectedTheme === 'forest' ? themeColors.secondary : "#10B981"} 
-                  />
+                  {podcastLoading ? (
+                    <MaterialCommunityIcons 
+                      name="loading" 
+                      size={20} 
+                      color={selectedTheme === 'forest' ? themeColors.secondary : "#10B981"} 
+                    />
+                  ) : (
+                    <MaterialCommunityIcons 
+                      name="volume-high" 
+                      size={20} 
+                      color={selectedTheme === 'forest' ? themeColors.secondary : "#10B981"} 
+                    />
+                  )}
                 </View>
                 <Text style={[styles.cardTitle, { color: themeColors.text }]}>Listen & Learn</Text>
               </View>
-              <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{currentTip.podcast.title}</Text>
-              <View style={styles.cardFooter}>
-                <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>by {currentTip.podcast.host} • {currentTip.podcast.duration}</Text>
-                <Pressable 
-                  style={[styles.linkButton, { backgroundColor: themeColors.secondary }]} 
-                  onPress={() => openLink(currentTip.podcast.spotifyUrl)}
+              
+              {podcastLoading ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={[styles.cardContent, { color: themeColors.textMuted }]}>Loading podcast recommendations...</Text>
+                </View>
+              ) : spotifyPodcasts.length > 0 ? (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.podcastCarouselContainer}
                 >
-                  <MaterialCommunityIcons name="volume-high" size={12} color={themeColors.secondaryText} />
-                  <Text style={[styles.linkButtonText, { color: themeColors.secondaryText }]}>Listen</Text>
-                </Pressable>
-              </View>
+                  {spotifyPodcasts.map((podcast, index) => (
+                    <View key={index} style={[styles.podcastCarouselItem, { borderColor: themeColors.border }]}>
+                      <Text style={[styles.podcastTitle, { color: themeColors.textSecondary }]} numberOfLines={2}>
+                        {podcast.name}
+                      </Text>
+                      {podcast.description && (
+                        <Text 
+                          style={[styles.podcastDescription, { color: themeColors.textMuted }]} 
+                          numberOfLines={3}
+                        >
+                          {podcast.description}
+                        </Text>
+                      )}
+                      <View style={styles.podcastFooter}>
+                        <Text style={[styles.podcastPublisher, { color: themeColors.textMuted }]} numberOfLines={1}>
+                          by {podcast.publisher}
+                        </Text>
+                        <Pressable 
+                          style={[styles.podcastButton, { backgroundColor: themeColors.secondary }]} 
+                          onPress={() => openLink(podcast.spotifyUrl)}
+                        >
+                          <MaterialCommunityIcons name="spotify" size={10} color={themeColors.secondaryText} />
+                          <Text style={[styles.podcastButtonText, { color: themeColors.secondaryText }]}>Listen</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <>
+                  <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{currentTip.podcast.title}</Text>
+                  <View style={styles.cardFooter}>
+                    <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>by {currentTip.podcast.host} • {currentTip.podcast.duration}</Text>
+                    <Pressable 
+                      style={[styles.linkButton, { backgroundColor: themeColors.secondary }]} 
+                      onPress={() => openLink(currentTip.podcast.spotifyUrl)}
+                    >
+                      <MaterialCommunityIcons name="volume-high" size={12} color={themeColors.secondaryText} />
+                      <Text style={[styles.linkButtonText, { color: themeColors.secondaryText }]}>Listen</Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
             </View>
           </View>
 
@@ -571,87 +492,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
   },
-  topicsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  badge: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 10,
-    color: '#4F46E5',
-    fontWeight: '500',
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-  },
-  dropdownButtonText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  dropdown: {
-    position: 'absolute',
-    top: 165, // Adjust this value to position the dropdown correctly below the button
-    right: 20,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 10,
-    zIndex: 1000,
-  },
-  topicItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  topicItemActive: {
-    backgroundColor: '#4F46E5',
-  },
-  topicIcon: {
-    fontSize: 16,
-  },
-  topicLabel: {
-    fontSize: 12,
-    color: '#374151',
-  },
-  topicLabelActive: {
-    color: 'white',
-  },
   card: {
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: '#dddbdbff',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 50,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -689,6 +539,64 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
+  podcastDescription: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  podcastCarouselContainer: {
+    paddingHorizontal: 0,
+    gap: 12,
+  },
+  podcastCarouselItem: {
+    width: 280,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  podcastTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  podcastFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  podcastPublisher: {
+    fontSize: 11,
+    color: '#6B7280',
+    flex: 1,
+    marginRight: 8,
+  },
+  podcastButton: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  podcastButtonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
+  },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -717,11 +625,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: '#dddbdbff',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 10,
   },
   courseHeader: {
     flexDirection: 'row',

@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.myApp"
+      "bundleIdentifier": "com.anonymous.myApp",
+      "infoPlist": {
+        "UIBackgroundModes": ["background-fetch", "background-processing"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -41,7 +44,14 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-background-fetch",
+        {
+          "backgroundFetchInterval": 50
+        }
+      ],
+      "expo-task-manager"
     ],
     "extra": {
       "GOOGLE_ANDROID_CLIENT_ID": "",

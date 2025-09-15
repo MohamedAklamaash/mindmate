@@ -169,16 +169,21 @@ export default function QuestionTen() {
         throw new Error('User data not available');
       }
 
+      console.log('User data in QuestionTen:', user); // Debug log
+      console.log('User email for Firebase:', user.email); // Debug log
+
       // Get all answers from the store
       const answers = getAllAnswers();
       
-      // Prepare user data for Firestore using the name from answers
+      // Prepare user data for Firestore using the email from Google sign-in
       const userData = {
         nickname: answers.userName || user.name || 'User',
-        email: user.email,
+        email: user.email, // Use the email from Google sign-in stored in user store
         userType: 'user' as const,
         isActive: true,
       };
+
+      console.log('Saving user data to Firebase:', userData); // Debug log
 
       let firestoreId: string;
       
@@ -193,7 +198,7 @@ export default function QuestionTen() {
         setUserFirestoreId(firestoreId);
       }
 
-      console.log('User data and answers saved successfully:', firestoreId);
+      console.log('User data and answers saved successfully with email:', userData.email);
       
       // Store the Firestore ID as persistent u_id that won't be deleted unless app is uninstalled
       setUserId(firestoreId);

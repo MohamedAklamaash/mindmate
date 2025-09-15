@@ -40,13 +40,14 @@ type UserStore = {
   setOnboardingStage: (stage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
   setUserFirestoreId: (firestoreId: string) => void; // Add method to set Firestore ID
   setUserId: (u_id: string) => void; // Add method to set persistent user ID
+  getUserEmail: () => string | null; // Helper method to get user email
   signOut: () => void;
 };
 
 // Create the store with persistence
 export const useUserStore = create<UserStore>()(  
   persist(
-    (set) => ({
+    (set, get) => ({
       userType: null,
       user: null,
       isAuthenticated: false,
@@ -55,7 +56,10 @@ export const useUserStore = create<UserStore>()(
       onboardingStage: 'none',
       u_id: null,
       setUserType: (type) => set({ userType: type }),
-      setUser: (user) => set({ user }),
+      setUser: (user) => {
+        console.log('Setting user in store with email:', user?.email); // Debug log
+        set({ user });
+      },
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
       setNeedsNickname: (needs) => set({ needsNickname: needs }),
       setOnboardingStage: (stage) => set({ onboardingStage: stage }),
@@ -63,6 +67,10 @@ export const useUserStore = create<UserStore>()(
         user: state.user ? { ...state.user, firestoreId } : null 
       })),
       setUserId: (u_id) => set({ u_id }),
+      getUserEmail: () => {
+        const state = get();
+        return state.user?.email || null;
+      },
       signOut: () => set({ user: null, isAuthenticated: false, u_id: null }),
     }),
     {
