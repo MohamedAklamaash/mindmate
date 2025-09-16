@@ -9,6 +9,7 @@ import {
   Linking,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -45,9 +46,13 @@ interface QuickTip {
   };
 }
 
+type ContextType = 'general' | 'stress' | 'anxiety' | 'depression' | 'motivation' | 'sleep' | 'confidence';
+
 export default function ResourcesScreen() {
   const [spotifyPodcasts, setSpotifyPodcasts] = useState<PodcastData[]>([]);
   const [podcastLoading, setPodcastLoading] = useState(false);
+  const [isTopicsDropdownOpen, setIsTopicsDropdownOpen] = useState(false);
+  const [currentContext, setCurrentContext] = useState<ContextType>('general');
   
   // Theme support
   const selectedTheme = useThemeStore((state) => state.selectedTheme);
@@ -107,23 +112,144 @@ export default function ResourcesScreen() {
     },
   ];
 
-  // Static health-focused content
-  const currentTip: QuickTip = {
-    quote: {
-      text: "The greatest revolution of our generation is the discovery that human beings, by changing the inner attitudes of their minds, can change the outer aspects of their lives.",
-      author: "William James"
+  // Context-based content
+  const quickTipsByContext: Record<ContextType, QuickTip> = {
+    general: {
+      quote: {
+        text: "The greatest revolution of our generation is the discovery that human beings, by changing the inner attitudes of their minds, can change the outer aspects of their lives.",
+        author: "William James"
+      },
+      article: {
+        title: "5 Simple Daily Habits for Better Mental Health",
+        source: "Psychology Today",
+        url: "https://www.psychologytoday.com/mental-health-habits"
+      },
+      podcast: {
+        title: "The Science of Happiness",
+        host: "Dr. Laurie Santos",
+        duration: "25 min",
+        spotifyUrl: "https://open.spotify.com/show/happiness"
+      }
     },
-    article: {
-      title: "5 Simple Daily Habits for Better Mental Health",
-      source: "Psychology Today",
-      url: "https://www.psychologytoday.com/mental-health-habits"
+    stress: {
+      quote: {
+        text: "You have been assigned this mountain to show others it can be moved.",
+        author: "Mel Robbins"
+      },
+      article: {
+        title: "10 Effective Stress Management Techniques",
+        source: "Harvard Health",
+        url: "https://www.health.harvard.edu/stress-management"
+      },
+      podcast: {
+        title: "Stress Less with Dr. Mark Hyman",
+        host: "Dr. Mark Hyman",
+        duration: "30 min",
+        spotifyUrl: "https://open.spotify.com/show/stress-less"
+      }
     },
-    podcast: {
-      title: "The Science of Happiness",
-      host: "Dr. Laurie Santos",
-      duration: "25 min",
-      spotifyUrl: "https://open.spotify.com/show/happiness"
+    anxiety: {
+      quote: {
+        text: "Anxiety is the dizziness of freedom.",
+        author: "Søren Kierkegaard"
+      },
+      article: {
+        title: "Understanding and Managing Anxiety",
+        source: "Mayo Clinic",
+        url: "https://www.mayoclinic.org/anxiety"
+      },
+      podcast: {
+        title: "The Anxiety Guy Podcast",
+        host: "Dennis Simsek",
+        duration: "35 min",
+        spotifyUrl: "https://open.spotify.com/show/anxiety-guy"
+      }
+    },
+    depression: {
+      quote: {
+        text: "Even the darkest night will end and the sun will rise.",
+        author: "Victor Hugo"
+      },
+      article: {
+        title: "Breaking Through Depression",
+        source: "Mental Health America",
+        url: "https://www.mhanational.org/depression"
+      },
+      podcast: {
+        title: "Depression and Bipolar Support",
+        host: "DBSA",
+        duration: "40 min",
+        spotifyUrl: "https://open.spotify.com/show/dbsa"
+      }
+    },
+    motivation: {
+      quote: {
+        text: "The only impossible journey is the one you never begin.",
+        author: "Tony Robbins"
+      },
+      article: {
+        title: "Building Lasting Motivation",
+        source: "Forbes",
+        url: "https://www.forbes.com/motivation"
+      },
+      podcast: {
+        title: "Motivation Daily",
+        host: "Motivation Ark",
+        duration: "20 min",
+        spotifyUrl: "https://open.spotify.com/show/motivation-daily"
+      }
+    },
+    sleep: {
+      quote: {
+        text: "Sleep is the best meditation.",
+        author: "Dalai Lama"
+      },
+      article: {
+        title: "The Science of Better Sleep",
+        source: "Sleep Foundation",
+        url: "https://www.sleepfoundation.org"
+      },
+      podcast: {
+        title: "Sleep With Me",
+        host: "Drew Ackerman",
+        duration: "60 min",
+        spotifyUrl: "https://open.spotify.com/show/sleep-with-me"
+      }
+    },
+    confidence: {
+      quote: {
+        text: "Believe you can and you're halfway there.",
+        author: "Theodore Roosevelt"
+      },
+      article: {
+        title: "Building Self-Confidence",
+        source: "Psychology Today",
+        url: "https://www.psychologytoday.com/confidence"
+      },
+      podcast: {
+        title: "The Confidence Code",
+        host: "Kay & Claire",
+        duration: "45 min",
+        spotifyUrl: "https://open.spotify.com/show/confidence-code"
+      }
     }
+  };
+
+  const topics = [
+    { key: 'general' as ContextType, label: 'General Wellness', icon: '💚' },
+    { key: 'stress' as ContextType, label: 'Stress Relief', icon: '🧘' },
+    { key: 'anxiety' as ContextType, label: 'Anxiety Support', icon: '💙' },
+    { key: 'depression' as ContextType, label: 'Mood Boost', icon: '🌟' },
+    { key: 'motivation' as ContextType, label: 'Motivation', icon: '🚀' },
+    { key: 'sleep' as ContextType, label: 'Better Sleep', icon: '😴' },
+    { key: 'confidence' as ContextType, label: 'Self-Confidence', icon: '💪' }
+  ];
+
+  const currentTip = quickTipsByContext[currentContext];
+
+  const updateQuickTips = (context: ContextType) => {
+    setCurrentContext(context);
+    setIsTopicsDropdownOpen(false);
   };
 
   // Fetch health podcast data from Spotify
@@ -252,6 +378,32 @@ export default function ResourcesScreen() {
     });
   };
 
+  const getTopicIcon = (context: ContextType): string => {
+    const iconMap: Record<ContextType, string> = {
+      general: 'heart',
+      stress: 'alert-circle',
+      anxiety: 'brain',
+      depression: 'weather-rainy',
+      motivation: 'fire',
+      sleep: 'sleep',
+      confidence: 'trophy'
+    };
+    return iconMap[context];
+  };
+
+  const getTopicLabel = (context: ContextType): string => {
+    const labelMap: Record<ContextType, string> = {
+      general: 'General Wellness',
+      stress: 'Stress Relief',
+      anxiety: 'Anxiety Support',
+      depression: 'Depression Help',
+      motivation: 'Motivation',
+      sleep: 'Better Sleep',
+      confidence: 'Build Confidence'
+    };
+    return labelMap[context];
+  };
+
   return (
     <LinearGradient colors={getBackgroundGradient()} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -264,6 +416,24 @@ export default function ResourcesScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Health & Wellness Tips</Text>
+              <Pressable 
+                style={[styles.dropdownButton, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
+                onPress={() => setIsTopicsDropdownOpen(true)}
+              >
+                <MaterialCommunityIcons 
+                  name={getTopicIcon(currentContext) as any} 
+                  size={18} 
+                  color={themeColors.text} 
+                />
+                <Text style={[styles.dropdownButtonText, { color: themeColors.text }]}>
+                  {getTopicLabel(currentContext)}
+                </Text>
+                <MaterialCommunityIcons 
+                  name="chevron-down" 
+                  size={16} 
+                  color={themeColors.textMuted} 
+                />
+              </Pressable>
             </View>
 
             {/* Daily Inspiration */}
@@ -449,6 +619,56 @@ export default function ResourcesScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Topic Selection Modal */}
+      <Modal
+        visible={isTopicsDropdownOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsTopicsDropdownOpen(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay} 
+          onPress={() => setIsTopicsDropdownOpen(false)}
+        >
+          <Pressable style={[styles.dropdownModal, { backgroundColor: themeColors.surface }]}>
+            <Text style={[styles.dropdownTitle, { color: themeColors.text }]}>Choose Your Focus</Text>
+            
+            {(['general', 'stress', 'anxiety', 'depression', 'motivation', 'sleep', 'confidence'] as ContextType[]).map((context) => (
+              <Pressable
+                key={context}
+                style={[
+                  styles.topicOption,
+                  currentContext === context && [styles.topicOptionActive, { backgroundColor: themeColors.primary + '20' }]
+                ]}
+                onPress={() => {
+                  setCurrentContext(context);
+                  setIsTopicsDropdownOpen(false);
+                }}
+              >
+                <MaterialCommunityIcons 
+                  name={getTopicIcon(context) as any} 
+                  size={24} 
+                  color={currentContext === context ? themeColors.primary : themeColors.textMuted} 
+                />
+                <Text style={[
+                  styles.topicLabel, 
+                  { color: currentContext === context ? themeColors.primary : themeColors.text }
+                ]}>
+                  {getTopicLabel(context)}
+                </Text>
+              </Pressable>
+            ))}
+
+            <Pressable 
+              style={[styles.closeButton, { backgroundColor: themeColors.primary }]}
+              onPress={() => setIsTopicsDropdownOpen(false)}
+            >
+              <Text style={[styles.closeButtonText, { color: themeColors.primaryText }]}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -742,5 +962,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#EF4444',
     fontWeight: 'bold',
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+  },
+  dropdownButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownModal: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    width: '80%',
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  topicOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 12,
+  },
+  topicOptionActive: {
+    backgroundColor: '#F3F4F6',
+  },
+  topicLabel: {
+    fontSize: 16,
+    flex: 1,
+  },
+  closeButton: {
+    marginTop: 16,
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
