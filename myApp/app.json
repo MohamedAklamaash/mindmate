@@ -4,22 +4,20 @@
     "slug": "witty-mate",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/WittyIcon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.myApp",
+      "icon": "./assets/images/WittyIcon.png",
       "infoPlist": {
         "UIBackgroundModes": ["background-fetch", "background-processing"]
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "icon": "./assets/images/WittyIcon.png",
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.myApp",
       "permissions": [
@@ -38,7 +36,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/WittyIcon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
