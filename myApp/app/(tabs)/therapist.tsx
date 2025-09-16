@@ -248,7 +248,7 @@ export default function TherapistScreen() {
                 </View>
 
                 <View style={[styles.scheduleSection, { borderTopColor: themeColors.border }]}>
-                  <Text style={[styles.sectionLabel, { color: themeColors.text }]}>Available Services:</Text>
+                  <Text style={[styles.sectionLabel, { color: themeColors.text }]}>Available Sessions:</Text>
                   {therapist.schedules && therapist.schedules.length > 0 ? (
                     therapist.schedules.map((schedule, index) => {
                       // Check if user has a conflict with this schedule
@@ -289,7 +289,7 @@ export default function TherapistScreen() {
                           </View>
                           <View style={styles.scheduleRow}>
                             <Text style={[styles.scheduleLabel, { color: themeColors.text }]}>Price:</Text>
-                            <Text style={[styles.priceText, { color: getAccentColor() }]}>${schedule.price || '23'}</Text>
+                            <Text style={[styles.priceText, { color: getAccentColor() }]}>₹{schedule.price || '23'}</Text>
                           </View>
                           
                           {hasConflict && (
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#b9b9b9ff',
     shadowOffset: {
       width: 0,
       height: 2,

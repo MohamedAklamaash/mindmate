@@ -365,13 +365,13 @@ export default function HomeScreen() {
     const hour = istTime.getUTCHours();
     
     if (hour >= 5 && hour < 12) {
-      return 'Good morning';
+      return 'Good Morning';
     } else if (hour >= 12 && hour < 17) {
-      return 'Good afternoon';
+      return 'Good Afternoon';
     } else if (hour >= 17 && hour < 21) {
-      return 'Good evening';
+      return 'Good Evening';
     } else {
-      return 'Good night';
+      return 'Good Evening';
     }
   };
 
@@ -1070,7 +1070,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomColor: 'rgba(183, 51, 51, 0.1)',
   },
   sessionTab: {
     flex: 1,
@@ -1110,14 +1110,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: '#f4f4f4ff',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 15,
   },
   sessionHeader: {
     flexDirection: 'row',
@@ -1249,14 +1249,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 30,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#cdc8c8ff',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 15,
   },
   noSessionTitle: {
     fontSize: 18,
@@ -1301,14 +1301,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#b9b8b8ff',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 15,
   },
   levelSection: {
     flexDirection: 'row',
@@ -1396,14 +1396,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: '#d1d1d1ff',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 15,
   },
   achievementsTitle: {
     fontSize: 16,
