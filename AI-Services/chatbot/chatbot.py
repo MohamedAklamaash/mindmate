@@ -21,6 +21,7 @@ class ChatBot:
         self._messages: List[Dict[str, str]] = []
         self._previous_Insights: List[str] = []
         self._previous_Summary: List[str] = []
+        self._dict_
         self._last_context_reset_date: date = datetime.now().date()
         
         self.db = DB(config_path)
