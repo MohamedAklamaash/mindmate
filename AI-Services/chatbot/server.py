@@ -29,6 +29,28 @@ class ChatResponse(BaseModel):
 class UserIdRequest(BaseModel):
     user_id: str
 
+# Automatically call "change_initial_message" once every 24 hours (every night)
+import threading
+import time
+
+def schedule_change_initial_message():
+    while True:
+        now = datetime.now()
+        # Calculate seconds until next midnight
+        next_midnight = (now.replace(hour=0, minute=0, second=0, microsecond=0) + 
+                         timedelta(days=1))
+        seconds_until_midnight = (next_midnight - now).total_seconds()
+        time.sleep(seconds_until_midnight)
+        try:
+            bot.change_initial_message()
+            print(f"Initial message changed for all users at {datetime.now()}")
+        except Exception as e:
+            print(f"Error changing initial message: {e}")
+
+# Start the scheduler in a background thread
+from datetime import timedelta
+threading.Thread(target=schedule_change_initial_message, daemon=True).start()
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -38,6 +60,51 @@ async def root():
 async def test():
     """Simple test endpoint"""
     return {"message": "Server is working!"}
+
+@app.post("/get-initial-message")
+async def get_initial_message(req: UserIdRequest):
+    """Get initial message for a user"""
+    try:
+        initial_message = bot.get_initial_message(req.user_id)
+        return {"message": initial_message, "user_id": req.user_id, "timestamp": str(datetime.now())}
+    except Exception as e:
+        print(f"Error in get initial message endpoint: {e}")
+        return {"status": "Error getting initial message", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(req: ChatRequest):
+    """Send a message to chatbot and get reply"""
+    try:
+        reply_text = bot.get_reply(req.message, req.user_id)
+        return ChatResponse(reply=reply_text)
+    except Exception as e:
+        print(f"Error in chat endpoint: {e}")
+        return ChatResponse(reply="Sorry, I encountered an error. Please try again.")
+
+@app.post("/get-question-info")
+async def get_question_info(req: UserIdRequest):
+    """Get question information for a user"""
+    try:
+        question_info = bot.get_question_info(req.user_id)
+        return {"question_info": question_info, "user_id": req.user_id, "timestamp": str(datetime.now())}
+    except Exception as e:
+        print(f"Error in get question info endpoint: {e}")
+        return {"status": "Error getting question info", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
+
+
+@app.post("/app-exit")
+async def app_exit(req: UserIdRequest):
+    """Handle app exit - summarize and store conversation data"""
+    try:
+        response = bot.app_exit(req.user_id)
+        return response
+    except Exception as e:
+        print(f"Error in app exit endpoint: {e}")
+        return {"status": "Error during app exit", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
+
+
+
+
 
 @app.get("/endpoints")
 async def list_endpoints():
@@ -59,30 +126,11 @@ async def list_endpoints():
     }
     return {"endpoints": endpoints, "timestamp": str(datetime.now())}
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest):
-    """Send a message to chatbot and get reply"""
-    try:
-        reply_text = bot.get_reply(req.message, req.user_id)
-        return ChatResponse(reply=reply_text)
-    except Exception as e:
-        print(f"Error in chat endpoint: {e}")
-        return ChatResponse(reply="Sorry, I encountered an error. Please try again.")
 
 @app.get("/info")
 async def model_info():
     """Get chatbot model info"""
     return bot.model_info()
-
-@app.post("/app-exit")
-async def app_exit(req: UserIdRequest):
-    """Handle app exit - summarize and store conversation data"""
-    try:
-        bot.app_exit(req.user_id)
-        return {"status": "App exit processed successfully", "user_id": req.user_id, "timestamp": str(datetime.now())}
-    except Exception as e:
-        print(f"Error in app exit endpoint: {e}")
-        return {"status": "Error during app exit", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
 @app.post("/hard-reset")
 async def hard_reset(req: UserIdRequest):
@@ -94,15 +142,6 @@ async def hard_reset(req: UserIdRequest):
         print(f"Error in hard reset endpoint: {e}")
         return {"status": "Error during hard reset", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
-@app.post("/get-initial-message")
-async def get_initial_message(req: UserIdRequest):
-    """Get initial message for a user"""
-    try:
-        initial_message = bot.get_initial_message(req.user_id)
-        return {"message": initial_message, "user_id": req.user_id, "timestamp": str(datetime.now())}
-    except Exception as e:
-        print(f"Error in get initial message endpoint: {e}")
-        return {"status": "Error getting initial message", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
 @app.post("/get-history")
 async def get_history(req: UserIdRequest):

@@ -29,10 +29,8 @@ class ChatBot:
         max_input_tokens = context_info['max_input_tokens']
         self._context_threshold = int(max_input_tokens * 0.7)  # 70% threshold
        
-        # to identify it is first message or not if it is first message then we need to add the user info to the message
-        self.chat.config['question_info'] = self.get_question_info()
-        self.initial_message=False
 
+    # get the user data for a user
     def _get_user_data(self, user_id: str) -> Dict[str, Any]:
         """Get or initialize user-specific data."""
         if user_id not in self._user_data:
@@ -43,6 +41,21 @@ class ChatBot:
                 'initial_message': True
             }
         return self._user_data[user_id]
+
+    # get the initial message for a user
+    def get_initial_message(self, user_id: str) -> str:
+        """Set initial message to False."""
+        user_data = self._get_user_data(user_id)
+        if user_data['initial_message'] == False:
+            return None
+        reply = self.get_reply(user_query="", user_id=user_id)
+        return reply
+
+    # change the initial message to True for all users
+    def change_initial_message(self):
+        for user_id in self._user_data:
+            self._user_data[user_id]['initial_message'] = True
+
 
     def classify_category(self, user_query: str, user_id: str, chat_history: Optional[List[Any]] = None) -> str:
         """Return the category label for a message and history."""
@@ -67,24 +80,19 @@ class ChatBot:
         """Generate a reply using specialised prompt, query, and optional memory."""
         # Get user-specific data
         user_data = self._get_user_data(user_id)
-        messages = user_data['messages']
-        previous_summary = user_data['previous_summary']
-        previous_insights = user_data['previous_insights']
-        initial_message = user_data['initial_message']
-
         # Add user query to messages
-        messages.append({"user": user_query})
+        user_data['messages'].append({"user": user_query})
         
-        if initial_message:
+        if user_data['initial_message']:
             user_data['initial_message'] = False
             specialised_prompt = self.get_specialised_prompt(user_query, user_id, chat_history)
             analysis_input = Analysis(
                 user_query=user_query,
                 specialised_prompt=specialised_prompt,
                 memory=(memory or {
-                    "messages": messages if messages else None,
-                    "previous_summary": previous_summary if previous_summary else None,
-                    "previous_insights": previous_insights if previous_insights else None,
+                    "messages": user_data['messages'] if user_data['messages'] else None,
+                    "previous_summary": user_data['previous_summary'] if user_data['previous_summary'] else None,
+                    "previous_insights": user_data['previous_insights'] if user_data['previous_insights'] else None,
                     "question_info": self.chat.config['question_info'] if self.chat.config['question_info'] else None,
                 }),
             )
@@ -95,9 +103,9 @@ class ChatBot:
                 user_query=user_query,
                 specialised_prompt=specialised_prompt,
                 memory=(memory or {
-                    "messages": messages if messages else None,
-                    "previous_summary": previous_summary if previous_summary else None,
-                    "previous_insights": previous_insights if previous_insights else None,
+                    "messages": user_data['messages'] if user_data['messages'] else None,
+                    "previous_summary": user_data['previous_summary'] if user_data['previous_summary'] else None,
+                    "previous_insights": user_data['previous_insights'] if user_data['previous_insights'] else None,
                 }),
             )
             response_text = self.chat.invoke_model(input=analysis_input, **kwargs)
@@ -110,26 +118,95 @@ class ChatBot:
             pass
         
         # Add AI response to messages
-        if messages:
-            messages[-1]["ai"] = response_text
+        if user_data['messages']:
+            user_data['messages'][-1]["ai"] = response_text
         
         # Check if we should summarise and compress oldest messages
-        self.maybe_summarise(user_id)
+        self.maybe_summarise(user_data)
         return response_text
 
-    def get_initial_message(self, user_id: str) -> str:
-        """Set initial message to False."""
-        user_data = self._get_user_data(user_id)
-        user_data['initial_message'] = True
-        reply = self.get_reply(user_query="", user_id=user_id)
-        return reply
+    def maybe_summarise(self, user_data: Dict[str, Any]) -> None:
+        """If context exceeds threshold, summarise the oldest 20% of messages and store results.
 
-    def get_notification(self, user_id: str) -> str:
-        """Set initial message to False."""
-        user_data = self._get_user_data(user_id)
-        user_data['initial_message'] = False
-        reply = self.get_reply(user_query="", user_id=user_id)
-        return reply
+        - Take the first 20% of user messages as the oldest chunk
+        - Remove them from user messages
+        - Summarise that chunk using structured `PersonalSummary`
+        - Append summary text to user's previous summary
+        - Append insights to user's previous insights
+        """
+        try:
+            
+            current_context_length = self._estimate_context_length(user_data)
+            if current_context_length <= self._context_threshold:
+                return
+
+            if not user_data['messages']:
+                return
+
+            logger.info(
+                f"Context length ({current_context_length}) exceeds threshold ({self._context_threshold}); compressing oldest messages for user {user_id}"
+            )
+
+            # Calculate how many messages form the oldest 20%
+            total_messages = len(user_data['messages'])
+            num_old = max(1, int(total_messages * 0.2))
+            old_chunk = user_data['messages'][:num_old]
+
+            # Remove the oldest chunk from active messages
+            user_data['messages'] = user_data['messages'][num_old:]
+
+            # Summarise the removed chunk
+            summ_input = Summarise(chat_history={"messages": old_chunk})
+            result: PersonalSummary = self.chat.invoke_model(
+                input=summ_input,
+                request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
+            )
+
+            # Persist structured summary and insights
+            if getattr(result, "summary", None):
+                user_data['previous_summary'].append(result.summary)
+            insights_obj = getattr(result, "insights", None)
+            if insights_obj is not None:
+                # Store as JSON-serialisable string to avoid Pydantic object leakage if needed
+                try:
+                    # Prefer storing the model itself if consumers handle it, else string
+                    user_data['previous_insights'].append(insights_obj)
+                except Exception:
+                    user_data['previous_insights'].append(str(insights_obj))
+        except Exception as e:
+            logger.warning(f"maybe_summarise failed for user {user_id}: {e}")
+    
+    def _estimate_context_length(self, user_data: Dict[str, Any]) -> int:
+        """Estimate the total context length in tokens (approximate)."""
+        
+        # Rough estimation: 1 token ≈ 4 characters for English text
+        total_chars = 0
+        
+        # Add messages length
+        for msg in user_data['messages']:
+            if isinstance(msg, dict):
+                for key, value in msg.items():
+                    if isinstance(value, str):
+                        total_chars += len(value)
+            elif isinstance(msg, str):
+                total_chars += len(msg)
+        
+        # Add previous summaries length
+        for context in user_data['previous_summary']:
+            if isinstance(context, str):
+                total_chars += len(context)
+        
+        # Add system prompt length (approximate)
+        # This is a rough estimate - in practice, you might want to get the actual system prompt
+        system_prompt_chars = 1000  # Approximate system prompt length
+        
+        total_chars += system_prompt_chars
+        
+        # Convert to approximate token count (1 token ≈ 2.5 characters)
+        estimated_tokens = int(total_chars / 2.5)
+        
+        return estimated_tokens
+
 
 
     def summarize(self, user_id: str, **kwargs) -> PersonalSummary:
@@ -147,94 +224,22 @@ class ChatBot:
             pass
         return summary
 
-    def maybe_summarise(self, user_id: str) -> None:
-        """If context exceeds threshold, summarise the oldest 20% of messages and store results.
 
-        - Take the first 20% of user messages as the oldest chunk
-        - Remove them from user messages
-        - Summarise that chunk using structured `PersonalSummary`
-        - Append summary text to user's previous summary
-        - Append insights to user's previous insights
-        """
-        try:
-            user_data = self._get_user_data(user_id)
-            messages = user_data['messages']
-            previous_summary = user_data['previous_summary']
-            previous_insights = user_data['previous_insights']
-            
-            current_context_length = self._estimate_context_length(user_id)
-            if current_context_length <= self._context_threshold:
-                return
 
-            if not messages:
-                return
 
-            logger.info(
-                f"Context length ({current_context_length}) exceeds threshold ({self._context_threshold}); compressing oldest messages for user {user_id}"
-            )
 
-            # Calculate how many messages form the oldest 20%
-            total_messages = len(messages)
-            num_old = max(1, int(total_messages * 0.2))
-            old_chunk = messages[:num_old]
 
-            # Remove the oldest chunk from active messages
-            user_data['messages'] = messages[num_old:]
 
-            # Summarise the removed chunk
-            summ_input = Summarise(chat_history={"messages": old_chunk})
-            result: PersonalSummary = self.chat.invoke_model(
-                input=summ_input,
-                request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
-            )
 
-            # Persist structured summary and insights
-            if getattr(result, "summary", None):
-                previous_summary.append(result.summary)
-            insights_obj = getattr(result, "insights", None)
-            if insights_obj is not None:
-                # Store as JSON-serialisable string to avoid Pydantic object leakage if needed
-                try:
-                    # Prefer storing the model itself if consumers handle it, else string
-                    previous_insights.append(insights_obj)
-                except Exception:
-                    previous_insights.append(str(insights_obj))
-        except Exception as e:
-            logger.warning(f"maybe_summarise failed for user {user_id}: {e}")
-    
-    def _estimate_context_length(self, user_id: str) -> int:
-        """Estimate the total context length in tokens (approximate)."""
+    def get_notification(self, user_id: str) -> str:
+        """Set initial message to False."""
         user_data = self._get_user_data(user_id)
-        messages = user_data['messages']
-        previous_summary = user_data['previous_summary']
-        
-        # Rough estimation: 1 token ≈ 4 characters for English text
-        total_chars = 0
-        
-        # Add messages length
-        for msg in messages:
-            if isinstance(msg, dict):
-                for key, value in msg.items():
-                    if isinstance(value, str):
-                        total_chars += len(value)
-            elif isinstance(msg, str):
-                total_chars += len(msg)
-        
-        # Add previous summaries length
-        for context in previous_summary:
-            if isinstance(context, str):
-                total_chars += len(context)
-        
-        # Add system prompt length (approximate)
-        # This is a rough estimate - in practice, you might want to get the actual system prompt
-        system_prompt_chars = 1000  # Approximate system prompt length
-        
-        total_chars += system_prompt_chars
-        
-        # Convert to approximate token count (1 token ≈ 2.5 characters)
-        estimated_tokens = int(total_chars / 2.5)
-        
-        return estimated_tokens
+        user_data['initial_message'] = False
+        reply = self.get_reply(user_query="", user_id=user_id)
+        return reply
+
+
+    
 
     def _maybe_clear_previous_context(self, user_id: str) -> None:
         """At local midnight, create a daily rollup and clear previous summaries/insights."""
@@ -300,11 +305,6 @@ class ChatBot:
             user_data['previous_summary'] = []
             user_data['previous_insights'] = []
             user_data['initial_message'] = True
-
-    def get_question_info(self, answers: List = None):
-        """Get question information - placeholder implementation."""
-        # This method needs to be implemented based on your requirements
-        return answers if answers else []
 
 
     def model_info(self) -> Dict:
