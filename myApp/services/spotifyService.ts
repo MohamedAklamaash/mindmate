@@ -86,7 +86,7 @@ class SpotifyService {
     }
   }
 
-  public async searchHealthPodcasts(): Promise<PodcastData[]> {
+  public async searchPodcasts(): Promise<PodcastData[]> {
     try {
       const token = await this.getAccessToken();
       

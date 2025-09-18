@@ -32,17 +32,18 @@ export const AppExitHandler = {
 // Hard reset handler service
 export const HardResetHandler = {
   // Function to call the hard reset endpoint
-  triggerHardReset: async () => {
+  triggerHardReset: async (user_id?: string) => {
     try {
-      const serverUrl = "http://192.168.0.92:8000"; 
-      
+      const serverUrl = "http://192.168.0.92:8000";
+
       const response = await fetch(`${serverUrl}/hard-reset`, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ user_id: user_id || 'anonymous' }),
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         console.log('Hard reset processed successfully:', result);

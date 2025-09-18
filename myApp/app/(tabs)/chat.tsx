@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import { useThemeStore, getThemeColors } from '@/store/themeStore';
+import { useUserStore } from '../../store/userStore';
 import { HardResetHandler } from '@/services/triggerer';
 
 export default function ChatScreen() {
@@ -16,6 +17,8 @@ export default function ChatScreen() {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const router = useRouter();
   const [showResetModal, setShowResetModal] = useState(false);
+  // Get persistent user id from store
+  const u_id = useUserStore((s) => s.u_id);
 
   // Theme support
   const selectedTheme = useThemeStore((state) => state.selectedTheme);
@@ -125,7 +128,7 @@ export default function ChatScreen() {
       const res = await fetch("https://mind-mate-delta.vercel.app/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg }),
+        body: JSON.stringify({ message: userMsg, user_id: u_id || 'anonymous' }),
       });
       
       console.log("Response status:", res.status);
@@ -306,7 +309,7 @@ export default function ChatScreen() {
       const res = await fetch("http://192.168.0.92:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: transcribedText }),
+        body: JSON.stringify({ message: transcribedText, user_id: u_id || 'anonymous' }),
       });
       
       console.log("Chatbot response status:", res.status);
@@ -361,7 +364,7 @@ export default function ChatScreen() {
       setInput("");
       
       // Call the server to perform hard reset
-      const result = await HardResetHandler.triggerHardReset();
+  const result = await HardResetHandler.triggerHardReset(u_id || 'anonymous');
       
       if (result.success) {
         console.log("Hard reset completed successfully");

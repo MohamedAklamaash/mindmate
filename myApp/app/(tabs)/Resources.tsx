@@ -256,7 +256,7 @@ export default function ResourcesScreen() {
   const fetchHealthPodcastData = async () => {
     setPodcastLoading(true);
     try {
-      const podcasts = await spotifyService.searchHealthPodcasts();
+      const podcasts = await spotifyService.searchPodcasts();
       setSpotifyPodcasts(podcasts);
     } catch (error) {
       console.error('Failed to fetch podcast data:', error);
