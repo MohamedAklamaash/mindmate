@@ -43,24 +43,24 @@ class ConversationInsights(BaseModel):
     class DateContext(BaseModel):
         """
         DateContext represents a specific date and optional time mentioned in the conversation,
-        along with a context string explaining its significance.
+        along with a context string explaining what could a message give to the user to start about the conversation about the significance of the event they talked about.
         """
         date: str = Field(
             ...,
-            description="The date of significance mentioned in the conversation."
+            description="The date of significance mentioned in the conversation so that we can start the conversation at that date."
         )
         time: str = Field(
             default=None,
-            description="The time associated with the date, if specified."
+            description="The time associated with the date, if specified so that we can start the conversation at that time."
         )
         context: str = Field(
             default=None,
-            description="Explanation of why this date/time is important."
+            description=" A message give to the user to start about theconversation about the significance of the event they talked about."
         )
 
     important_dates: List[DateContext] = Field(
         default=None,
-        description="A list of important dates and times mentioned in the conversation."
+        description="A list of important dates and times mentioned in the conversation so that we can start the conversation at that date and time."
     )
     explanation: str = Field(
         default=None,

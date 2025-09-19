@@ -38,6 +38,7 @@ class ChatBot:
                 'messages': [],
                 'previous_insights': [],
                 'previous_summary': [],
+                'notification': [],
                 'initial_message': True
             }
         return self._user_data[user_id]
@@ -56,6 +57,9 @@ class ChatBot:
         for user_id in self._user_data:
             self._user_data[user_id]['initial_message'] = True
 
+    # store question info for a user
+    def store_question_info(self, user_id: str, question_info: str):
+        self._user_data[user_id]['question_info'] = question_info
 
     def classify_category(self, user_query: str, user_id: str, chat_history: Optional[List[Any]] = None) -> str:
         """Return the category label for a message and history."""
@@ -93,7 +97,7 @@ class ChatBot:
                     "messages": user_data['messages'] if user_data['messages'] else None,
                     "previous_summary": user_data['previous_summary'] if user_data['previous_summary'] else None,
                     "previous_insights": user_data['previous_insights'] if user_data['previous_insights'] else None,
-                    "question_info": self.chat.config['question_info'] if self.chat.config['question_info'] else None,
+                    "question_info": user_data['question_info'] if user_data['question_info'] else None,
                 }),
             )
             response_text = self.chat.invoke_model(input=analysis_input, system_prompt_override=SYSTEM_PROMPT_FIRST_MESSAGE, **kwargs)
@@ -171,8 +175,16 @@ class ChatBot:
                 try:
                     # Prefer storing the model itself if consumers handle it, else string
                     user_data['previous_insights'].append(insights_obj)
+                    if 'notification' not in user_data:
+                        user_data['notification'] = []
+                    if insights_obj.important_dates:
+                        user_data['notification'].append(insights_obj.important_dates)
                 except Exception:
                     user_data['previous_insights'].append(str(insights_obj))
+                    if 'notification' not in user_data:
+                        user_data['notification'] = []
+                    if insights_obj.important_dates:
+                        user_data['notification'].append(insights_obj.important_dates)
         except Exception as e:
             logger.warning(f"maybe_summarise failed for user {user_id}: {e}")
     
@@ -198,7 +210,7 @@ class ChatBot:
         
         # Add system prompt length (approximate)
         # This is a rough estimate - in practice, you might want to get the actual system prompt
-        system_prompt_chars = 1000  # Approximate system prompt length
+        system_prompt_chars = 500  # Approximate system prompt length
         
         total_chars += system_prompt_chars
         
@@ -206,6 +218,74 @@ class ChatBot:
         estimated_tokens = int(total_chars / 2.5)
         
         return estimated_tokens
+
+    def app_exit(self, user_id: str) -> None:
+        """On app exit, summarise all remaining messages and store to previous summary/insights, then clear messages."""
+        try:
+            user_data = self._get_user_data(user_id)
+            messages = user_data['messages']
+            if messages:
+                summ_input = Summarise(chat_history={"messages": messages})
+                result: PersonalSummary = self.chat.invoke_model(
+                    input=summ_input,
+                    request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
+                )
+                if getattr(result, "summary", None):
+                    user_data['previous_summary'].append(result.summary)
+                if getattr(result, "insights", None):
+                    user_data['previous_insights'].append(result.insights)
+            # Clear active messages after persisting
+            if 'notification' not in user_data:
+                user_data['notification'] = []
+            if result.insights and result.insights.important_dates:
+                user_data['notification'].append(result.insights.important_dates)
+            notification = user_data['notification']
+            user_data['notification'] = []
+            user_data['messages'] = []
+            return self.get_notification(notification)
+        except Exception as e:
+            logger.warning(f"app_exit summarisation failed for user {user_id}: {e}")
+            return []
+
+    def get_notification(self, notification: List[Any]) -> List[Dict[str, str]]:
+        """Get the notification to the user."""
+        notification_list = []
+        
+        for insight in notification:
+            if hasattr(insight, 'important_dates') and insight.important_dates:
+                for date_context in insight.important_dates:
+                    # Skip if there is no context
+                    if not date_context.context:
+                        continue
+                    # Combine date and time for timestamp
+                    timestamp = date_context.date
+                    if date_context.time:
+                        timestamp = f"{date_context.date} {date_context.time}"
+                    
+                    notification_dict = {
+                        'timestamp': timestamp,
+                        'notification_message': date_context.context
+                    }
+                    notification_list.append(notification_dict)
+        
+        return notification_list
+
+    def get_emotion_sentiment(self, user_id: str) -> str:
+        """Get the emotion and sentiment of the user."""
+        user_data = self._get_user_data(user_id)
+        if user_data['previous_insights']:
+            return user_data['previous_insights'][-1].overall_emotion, user_data['previous_insights'][-1].overall_sentiment
+        return None, None
+
+    def get_quote_
+
+
+
+
+
+
+
+
 
 
 
@@ -223,21 +303,6 @@ class ChatBot:
         except Exception:
             pass
         return summary
-
-
-
-
-
-
-
-
-    def get_notification(self, user_id: str) -> str:
-        """Set initial message to False."""
-        user_data = self._get_user_data(user_id)
-        user_data['initial_message'] = False
-        reply = self.get_reply(user_query="", user_id=user_id)
-        return reply
-
 
     
 
@@ -263,25 +328,7 @@ class ChatBot:
             except Exception:
                 pass
 
-    def app_exit(self, user_id: str) -> None:
-        """On app exit, summarise all remaining messages and store to previous summary/insights, then clear messages."""
-        try:
-            user_data = self._get_user_data(user_id)
-            messages = user_data['messages']
-            if messages:
-                summ_input = Summarise(chat_history={"messages": messages})
-                result: PersonalSummary = self.chat.invoke_model(
-                    input=summ_input,
-                    request_format={"type": "json", "schema": PersonalSummary, "mime_type": "application/json"},
-                )
-                if getattr(result, "summary", None):
-                    user_data['previous_summary'].append(result.summary)
-                if getattr(result, "insights", None):
-                    user_data['previous_insights'].append(result.insights)
-            # Clear active messages after persisting
-            user_data['messages'] = []
-        except Exception as e:
-            logger.warning(f"app_exit summarisation failed for user {user_id}: {e}")
+    
 
 
     def hard_reset(self, user_id: str) -> None:
@@ -304,6 +351,7 @@ class ChatBot:
             user_data['messages'] = []
             user_data['previous_summary'] = []
             user_data['previous_insights'] = []
+            user_data['notification'] = []
             user_data['initial_message'] = True
 
 

@@ -81,56 +81,30 @@ async def chat_endpoint(req: ChatRequest):
         print(f"Error in chat endpoint: {e}")
         return ChatResponse(reply="Sorry, I encountered an error. Please try again.")
 
-@app.post("/get-question-info")
-async def get_question_info(req: UserIdRequest):
-    """Get question information for a user"""
+@app.post("/store-question-info")
+async def store_question_info(req: ChatRequest):
+    """Store question information for a user"""
     try:
-        question_info = bot.get_question_info(req.user_id)
-        return {"question_info": question_info, "user_id": req.user_id, "timestamp": str(datetime.now())}
+        bot.store_question_info(req.user_id, req.message)
+        return {"status": "Question info stored successfully", "user_id": req.user_id, "timestamp": str(datetime.now())}
     except Exception as e:
-        print(f"Error in get question info endpoint: {e}")
-        return {"status": "Error getting question info", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
-
+        print(f"Error in store question info endpoint: {e}")
+        return {"status": "Error storing question info", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
 @app.post("/app-exit")
 async def app_exit(req: UserIdRequest):
     """Handle app exit - summarize and store conversation data"""
     try:
-        response = bot.app_exit(req.user_id)
-        return response
+        notifications = bot.app_exit(req.user_id)
+        return {
+            "status": "App exit completed successfully", 
+            "notifications": notifications,
+            "user_id": req.user_id, 
+            "timestamp": str(datetime.now())
+        }
     except Exception as e:
         print(f"Error in app exit endpoint: {e}")
         return {"status": "Error during app exit", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
-
-
-
-
-
-@app.get("/endpoints")
-async def list_endpoints():
-    """List all available endpoints and their usage"""
-    endpoints = {
-        "GET /": "Health check endpoint",
-        "GET /test": "Simple test endpoint", 
-        "GET /info": "Get chatbot model info",
-        "GET /endpoints": "List all available endpoints",
-        "POST /chat": "Send a message to chatbot and get reply (requires: message, user_id)",
-        "POST /app-exit": "Handle app exit - summarize and store conversation data (requires: user_id)",
-        "POST /hard-reset": "Handle hard reset - save conversation to DB and clear all data (requires: user_id)",
-        "POST /get-initial-message": "Get initial message for a user (requires: user_id)",
-        "POST /get-notification": "Get notification for a user (requires: user_id)",
-        "POST /get-history": "Get conversation history for a user (requires: user_id)",
-        "POST /reset": "Reset conversation history for a user (requires: user_id)",
-        "POST /classify-category": "Classify the category of a user message (requires: message, user_id)",
-        "POST /get-specialised-prompt": "Get specialised prompt for a user message (requires: message, user_id)"
-    }
-    return {"endpoints": endpoints, "timestamp": str(datetime.now())}
-
-
-@app.get("/info")
-async def model_info():
-    """Get chatbot model info"""
-    return bot.model_info()
 
 @app.post("/hard-reset")
 async def hard_reset(req: UserIdRequest):
@@ -163,6 +137,31 @@ async def reset(req: UserIdRequest):
         print(f"Error in reset endpoint: {e}")
         return {"status": "Error during reset", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
+@app.get("/endpoints")
+async def list_endpoints():
+    """List all available endpoints and their usage"""
+    endpoints = {
+        "GET /": "Health check endpoint",
+        "GET /test": "Simple test endpoint", 
+        "GET /endpoints": "List all available endpoints",
+        "POST /chat": "Send a message to chatbot and get reply (requires: message, user_id)",
+        "POST /app-exit": "Handle app exit - summarize and store conversation data (requires: user_id)",
+        "POST /hard-reset": "Handle hard reset - save conversation to DB and clear all data (requires: user_id)",
+        "POST /get-initial-message": "Get initial message for a user (requires: user_id)",
+        "POST /store-question-info": "Store question information for a user (requires: message, user_id)",
+        "POST /get-notification": "Get notification for a user (requires: user_id)",
+        "POST /get-history": "Get conversation history for a user (requires: user_id)",
+        "POST /reset": "Reset conversation history for a user (requires: user_id)",
+        "POST /classify-category": "Classify the category of a user message (requires: message, user_id)",
+        "POST /get-specialised-prompt": "Get specialised prompt for a user message (requires: message, user_id)"
+    }
+    return {"endpoints": endpoints, "timestamp": str(datetime.now())}
+
+
+@app.get("/info")
+async def model_info():
+    """Get chatbot model info"""
+    return bot.model_info()
 # Hosting code
 if __name__ == "__main__":
     import uvicorn
