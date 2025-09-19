@@ -242,10 +242,10 @@ class ChatBot:
             notification = user_data['notification']
             user_data['notification'] = []
             user_data['messages'] = []
-            return self.get_notification(notification)
+            return self.get_notification(notification) , self.get_emotion_sentiment(user_id)
         except Exception as e:
             logger.warning(f"app_exit summarisation failed for user {user_id}: {e}")
-            return []
+            return [] , (None, None)
 
     def get_notification(self, notification: List[Any]) -> List[Dict[str, str]]:
         """Get the notification to the user."""
@@ -277,7 +277,8 @@ class ChatBot:
             return user_data['previous_insights'][-1].overall_emotion, user_data['previous_insights'][-1].overall_sentiment
         return None, None
 
-    def get_quote_
+    def get_quote_thought(self, emotion: str) -> str:
+        """Get the quote and thought of the user."""
 
 
 

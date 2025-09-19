@@ -95,10 +95,11 @@ async def store_question_info(req: ChatRequest):
 async def app_exit(req: UserIdRequest):
     """Handle app exit - summarize and store conversation data"""
     try:
-        notifications = bot.app_exit(req.user_id)
+        notifications , emotion_sentiment = bot.app_exit(req.user_id)
         return {
             "status": "App exit completed successfully", 
             "notifications": notifications,
+            "emotion_sentiment": emotion_sentiment,
             "user_id": req.user_id, 
             "timestamp": str(datetime.now())
         }
