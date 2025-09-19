@@ -234,11 +234,11 @@ class ChatBot:
                     user_data['previous_summary'].append(result.summary)
                 if getattr(result, "insights", None):
                     user_data['previous_insights'].append(result.insights)
-            # Clear active messages after persisting
-            if 'notification' not in user_data:
-                user_data['notification'] = []
-            if result.insights and result.insights.important_dates:
-                user_data['notification'].append(result.insights.important_dates)
+                # Clear active messages after persisting
+                if 'notification' not in user_data:
+                    user_data['notification'] = []
+                if result.insights and result.insights.important_dates:
+                    user_data['notification'].append(result.insights.important_dates)
             notification = user_data['notification']
             user_data['notification'] = []
             user_data['messages'] = []
