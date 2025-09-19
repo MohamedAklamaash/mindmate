@@ -219,7 +219,7 @@ class ChatBot:
         
         return estimated_tokens
 
-    def app_exit(self, user_id: str) -> None:
+    def app_exit(self, user_id: str) -> tuple:
         """On app exit, summarise all remaining messages and store to previous summary/insights, then clear messages."""
         try:
             user_data = self._get_user_data(user_id)

@@ -210,11 +210,20 @@ class CloudDB:
                 # Fall back to no credentials (use metadata server or emulator)
                 firebase_admin.initialize_app(options={"projectId": self.project_id} if self.project_id else None)
 
-        self.client = firestore.client()
-        self.collection_name = "summary"
+        try:
+            self.client = firestore.client()
+            self.collection_name = "summary"
+        except Exception as e:
+            print(f"Warning: Could not initialize Firestore client: {e}")
+            self.client = None
+            self.collection_name = "summary"
 
     def insert_summary(self, input: PersonalSummary, user_id: str) -> bool:
         try:
+            if self.client is None:
+                print("Warning: Firestore client not available, skipping cloud insert")
+                return False
+                
             if hasattr(input, "model_dump") and callable(getattr(input, "model_dump")):
                 payload = input.model_dump()
             else:
