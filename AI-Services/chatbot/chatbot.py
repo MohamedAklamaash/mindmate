@@ -20,7 +20,6 @@ class ChatBot:
         self.prompts = PromptManager(self.chat)
         # Dictionary to store user-specific data by user_id
         self._user_data: Dict[str, Dict[str, Any]] = {}
-        self._last_context_reset_date: date = datetime.now().date()
         
         self.db = DB(config_path)
         
@@ -277,18 +276,19 @@ class ChatBot:
             return user_data['previous_insights'][-1].overall_emotion, user_data['previous_insights'][-1].overall_sentiment
         return None, None
 
-    def get_quote_thought(self, emotion: str) -> str:
-        """Get the quote and thought of the user."""
+    def get_all_user_ids(self) -> List[str]:
+        """Get all user IDs that have data in the chatbot."""
+        return list(self._user_data.keys())
 
-
-
-
-
-
-
-
-
-
+    def clear_context_for_all_users(self) -> None:
+        """Call _maybe_clear_previous_context for all users."""
+        user_ids = self.get_all_user_ids()
+        for user_id in user_ids:
+            try:
+                self._maybe_clear_previous_context(user_id)
+                logger.info(f"Cleared context for user {user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to clear context for user {user_id}: {e}")
 
     def summarize(self, user_id: str, **kwargs) -> PersonalSummary:
         """Summarize internal conversation history for memory (structured)."""
@@ -305,50 +305,100 @@ class ChatBot:
             pass
         return summary
 
-    
-
     def _maybe_clear_previous_context(self, user_id: str) -> None:
-        """At local midnight, create a daily rollup and clear previous summaries/insights."""
-        now = datetime.now()
-        if now.date() != self._last_context_reset_date:
-            try:
-                user_data = self._get_user_data(user_id)
-                # Create an overarching insights rollup for the day from current messages
-                daily_summary: PersonalSummary = self.summarize(user_id)
-                if getattr(daily_summary, "summary", None):
-                    user_data['previous_summary'].append(daily_summary.summary)
-                if getattr(daily_summary, "insights", None):
-                    user_data['previous_insights'].append(daily_summary.insights)
-            except Exception:
-                pass
-            user_data['previous_summary'].clear()
-            user_data['previous_insights'].clear()
-            self._last_context_reset_date = now.date()
-            try:
-                logger.info(f"chatbot.previous_memory.cleared_midnight for user {user_id}")
-            except Exception:
-                pass
-
-    
-
-
-    def hard_reset(self, user_id: str) -> None:
-        """Dump current memory to DB if available, then clear all and reset initial state."""
+        """Create a daily rollup and remove last 40% of previous summaries/insights to local DB."""
         try:
             user_data = self._get_user_data(user_id)
-            if self.db and hasattr(self.db, "save_conversation"):
-                try:
-                    from datetime import datetime
-                    timestamp = datetime.now().isoformat()
-                    self.db.save_conversation(
-                        messages=user_data['messages'],
-                        previous_summaries=user_data['previous_summary'],
-                        previous_insights=user_data['previous_insights'],
-                        timestamp=timestamp
+            # Create an overarching insights rollup for the day from current messages
+            daily_summary: PersonalSummary = self.summarize(user_id)
+            if getattr(daily_summary, "summary", None):
+                user_data['previous_summary'].append(daily_summary.summary)
+            if getattr(daily_summary, "insights", None):
+                user_data['previous_insights'].append(daily_summary.insights)
+            if getattr(daily_summary, "notification", None):
+                user_data['notification'].append(daily_summary.insights.important_dates)
+            
+            # Remove last 40% of previous summaries and insights, store them in local DB
+            self._remove_and_store_last_40_percent(user_id)
+            
+            logger.info(f"chatbot.previous_memory.cleared for user {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to clear previous context for user {user_id}: {e}")
+
+    def _remove_and_store_last_40_percent(self, user_id: str) -> None:
+        """Remove last 40% of previous summaries and insights, store them in local DB."""
+        user_data = self._get_user_data(user_id)
+        
+        # Calculate 40% of the lists
+        total_summaries = len(user_data['previous_summary'])
+        total_insights = len(user_data['previous_insights'])
+        
+        # Use the minimum length to ensure we don't go out of bounds
+        min_length = min(total_summaries, total_insights)
+        items_to_remove = max(0, int(min_length * 0.4))
+        
+        # Store the items to be removed in local DB before removing them
+        try:
+            # Store paired summary and insights (they correspond by index)
+            for i in range(min_length - items_to_remove, min_length):
+                if i < len(user_data['previous_summary']) and i < len(user_data['previous_insights']):
+                    summary_text = user_data['previous_summary'][i]
+                    insights_obj = user_data['previous_insights'][i]
+                    
+                    # Create a PersonalSummary object with both summary and insights paired together
+                    personal_summary = PersonalSummary(
+                        summary=summary_text,
+                        insights=insights_obj
                     )
-                except Exception as db_err:
-                    logger.warning(f"chat_reset DB save failed for user {user_id}: {db_err}")
+                    self.db.insert_local_summary(personal_summary, user_id)
+        except Exception as e:
+            logger.warning(f"Failed to store last 40% in local DB for user {user_id}: {e}")
+        
+        # Remove the last 40% from both lists
+        if items_to_remove > 0:
+            user_data['previous_summary'] = user_data['previous_summary'][:-items_to_remove]
+            user_data['previous_insights'] = user_data['previous_insights'][:-items_to_remove]
+
+    def hard_reset(self, user_id: str) -> None:
+        """First save existing summaries/insights, then summarize current messages and save, then clear all."""
+        try:
+            user_data = self._get_user_data(user_id)
+            
+            # FIRST: Save existing summaries and insights to DB (paired by index)
+            if user_data['previous_summary'] and user_data['previous_insights']:
+                try:
+                    min_length = min(len(user_data['previous_summary']), len(user_data['previous_insights']))
+                    for i in range(min_length):
+                        summary_text = user_data['previous_summary'][i]
+                        insights_obj = user_data['previous_insights'][i]
+                        
+                        # Create PersonalSummary with paired summary and insights
+                        personal_summary = PersonalSummary(
+                            summary=summary_text,
+                            insights=insights_obj
+                        )
+                        self.db.insert_local_summary(personal_summary, user_id)
+                    
+                    logger.info(f"Saved {min_length} existing paired summaries/insights to DB for user {user_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to save existing summaries/insights for user {user_id}: {e}")
+            
+            # THEN: If there are messages, summarize them and save to DB
+            if user_data['messages']:
+                try:
+                    # Create a summary from current messages
+                    summary = self.summarize(user_id)
+                    if summary:
+                        # Save the latest summary to local DB
+                        self.db.insert_local_summary(summary, user_id)
+                        logger.info(f"Saved latest conversation summary to DB for user {user_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to save latest conversation summary for user {user_id}: {e}")
+                    
+        except Exception as e:
+            logger.warning(f"Hard reset failed for user {user_id}: {e}")
         finally:
+            # Clear all user data
             user_data['messages'] = []
             user_data['previous_summary'] = []
             user_data['previous_insights'] = []
@@ -373,14 +423,10 @@ class ChatBot:
         """Clear stored history."""
         user_data = self._get_user_data(user_id)
         user_data['messages'] = []
-    
-
-
-
-
-
-
-
+        user_data['previous_summary'] = []
+        user_data['previous_insights'] = []
+        user_data['notification'] = []
+        user_data['initial_message'] = True
 
 __all__ = ["ChatBot"]
 

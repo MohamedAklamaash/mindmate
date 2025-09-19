@@ -4,6 +4,7 @@ from datetime import datetime
 from chatbot import ChatBot
 import os
 import yaml
+from google import genai
 
 # Load config
 cfg_path = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -29,6 +30,14 @@ class ChatResponse(BaseModel):
 class UserIdRequest(BaseModel):
     user_id: str
 
+class EmotionRequest(BaseModel):
+    emotion: str
+
+class EmotionReplyResponse(BaseModel):
+    quote: str
+    author: str
+    thought: str
+
 # Automatically call "change_initial_message" once every 24 hours (every night)
 import threading
 import time
@@ -51,6 +60,25 @@ def schedule_change_initial_message():
 from datetime import timedelta
 threading.Thread(target=schedule_change_initial_message, daemon=True).start()
 
+# Schedule context clearing for all users every 24 hours
+def schedule_clear_context():
+    while True:
+        now = datetime.now()
+        # Calculate seconds until next midnight
+        next_midnight = (now.replace(hour=0, minute=0, second=0, microsecond=0) + 
+                         timedelta(days=1))
+        seconds_until_midnight = (next_midnight - now).total_seconds()
+        time.sleep(seconds_until_midnight)
+        try:
+            bot.clear_context_for_all_users()
+            print(f"Context cleared for all users at {datetime.now()}")
+        except Exception as e:
+            print(f"Error clearing context for all users: {e}")
+
+# Start the context clearing scheduler in a background thread
+threading.Thread(target=schedule_clear_context, daemon=True).start()
+
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -60,6 +88,42 @@ async def root():
 async def test():
     """Simple test endpoint"""
     return {"message": "Server is working!"}
+
+@app.post("/get-quote-thought", response_model=EmotionReplyResponse)
+async def get_quote_thought(req: EmotionRequest):
+    """Get the quote and thought of the user."""
+    try:
+        prompt = f"""
+You are an assistant that provides inspiration based on a user's emotion.
+
+Given the emotion "{req.emotion}" as input, respond with:
+1. A real, well-known quote that matches the emotion.
+2. The author of the quote (must be accurate and real).
+3. A four-line original inspirational thought or reflection, written by you, that is relevant to the emotion and the quote.
+
+Both the quote and the thought must be clearly related to the input emotion.
+"""
+        client = genai.Client(api_key=cfg['api_key'])
+        response = client.models.generate_content(
+            model=cfg['model_name'],
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": EmotionReplyResponse,
+            },
+        )
+        
+        # Use the parsed response directly
+        emotion_response: EmotionReplyResponse = response.parsed
+        return emotion_response
+        
+    except Exception as e:
+        print(f"Error in get quote thought endpoint: {e}")
+        return EmotionReplyResponse(
+            quote="Error occurred", 
+            author="System", 
+            thought="Sorry, I encountered an error while processing your request."
+        )
 
 @app.post("/get-initial-message")
 async def get_initial_message(req: UserIdRequest):
@@ -157,7 +221,6 @@ async def list_endpoints():
         "POST /get-specialised-prompt": "Get specialised prompt for a user message (requires: message, user_id)"
     }
     return {"endpoints": endpoints, "timestamp": str(datetime.now())}
-
 
 @app.get("/info")
 async def model_info():
