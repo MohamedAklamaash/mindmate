@@ -248,7 +248,7 @@ class DB:
         """
         self.config_path = config_path
         self.local_db = ServerDB(config_path)
-        self.cloud_db = CloudDB(config_path)
+        self.cloud_db = None
 
     def insert_local_summary(self, input: PersonalSummary, user_id: str) -> bool:
         return self.local_db.insert_summary(input, user_id)
