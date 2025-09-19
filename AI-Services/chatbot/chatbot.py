@@ -58,7 +58,8 @@ class ChatBot:
 
     # store question info for a user
     def store_question_info(self, user_id: str, question_info: str):
-        self._user_data[user_id]['question_info'] = question_info
+        user_data = self._get_user_data(user_id)
+        user_data['question_info'] = question_info
 
     def classify_category(self, user_query: str, user_id: str, chat_history: Optional[List[Any]] = None) -> str:
         """Return the category label for a message and history."""
