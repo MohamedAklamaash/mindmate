@@ -98,7 +98,7 @@ class ChatbotAPITester {
       }
 
       const response = await fetch(url, options);
-      const data = await response.json();
+      const data = await response.json() as T;
 
       console.log(`✅ Response (${response.status}):`, JSON.stringify(data, null, 2));
       console.log('─'.repeat(50));
