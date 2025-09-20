@@ -5,6 +5,7 @@ from chatbot import ChatBot
 import os
 import yaml
 from google import genai
+from typing import Any
 
 # Load config
 cfg_path = os.path.join(os.path.dirname(__file__), "config.yaml")
