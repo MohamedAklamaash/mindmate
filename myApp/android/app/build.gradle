@@ -83,16 +83,15 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
-    ndkVersion rootProject.ext.ndkVersion
-
-    buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdk 34
+    buildToolsVersion "34.0.0"
+    //ndkVersion "26.1.10909125"
 
     namespace 'com.anonymous.myApp'
     defaultConfig {
         applicationId 'com.anonymous.myApp'
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        minSdkVersion 24
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0.0"
     }

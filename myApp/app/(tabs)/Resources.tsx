@@ -199,6 +199,26 @@ export default function ResourcesScreen() {
     return () => listener.remove();
   }, []);
 
+    // Listen for quotes fetched by the shared service so UI updates even when
+    // the fetch was initiated elsewhere (e.g., AppExitHandler). Payload shape: { quote, author, thought }
+    useEffect(() => {
+      const qListener = DeviceEventEmitter.addListener('quotesFetched', (payload) => {
+        try {
+          console.log('Received quotesFetched payload:', payload);
+          if (!payload) return;
+
+          setQuoteOfTheDay({ text: payload.quote || fallbackTip.quote.text, author: payload.author || fallbackTip.quote.author });
+          const thoughtText = payload.thought || payload.quote || fallbackTip.quote.text;
+          // Respect design decision: Daily Inspiration author is 'Witty Mate'
+          setAiQuote({ text: thoughtText, author: 'Witty Mate' });
+        } catch (e) {
+          console.error('Error applying quotesFetched payload:', e);
+        }
+      });
+
+      return () => qListener.remove();
+    }, []);
+
   // Combined fetch that calls the endpoint once and sets both Quote of the Day
   // and Daily Inspiration (thought). Uses a ref to avoid duplicate concurrent calls.
   const fetchQuoteCombined = async (emotionOverride?: string | string[]) => {

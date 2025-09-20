@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import * as Notifications from "expo-notifications";
 import { AppState, AppStateStatus, DeviceEventEmitter } from "react-native";
 import { useUserStore } from '../store/userStore';
+import { combinedFetchService } from './quoteFetcher';
 
 // Server base URLs
 const DEFAULT_SERVER = "https://mind-mate-two-tau.vercel.app";
@@ -36,6 +37,7 @@ export const AppExitHandler = {
 
       if (response.ok) {
         console.log('App exit processed successfully:', parsed);
+        console.log('App exit RESPONSE', response);
         // Save emotion_sentiment to userStore if available
         if (parsed && parsed.emotion_sentiment) {
           try {
@@ -45,6 +47,13 @@ export const AppExitHandler = {
             try {
               DeviceEventEmitter.emit('appOpened', { emotion_sentiment: parsed.emotion_sentiment });
               console.log('Emitted appOpened event with emotion_sentiment from app-exit.');
+              // Also proactively fetch quotes now that we have the emotion
+              try {
+                await combinedFetchService(parsed.emotion_sentiment);
+                console.log('combinedFetchService called from AppExitHandler.');
+              } catch (qErr) {
+                console.warn('combinedFetchService failed when called from AppExitHandler:', qErr);
+              }
             } catch (emitErr) {
               console.warn('Failed to emit appOpened event after app-exit:', emitErr);
             }
