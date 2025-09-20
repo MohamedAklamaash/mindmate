@@ -31,7 +31,7 @@ class UserIdRequest(BaseModel):
     user_id: str
 
 class EmotionRequest(BaseModel):
-    emotion: str
+    emotion: Any
 
 class EmotionReplyResponse(BaseModel):
     quote: str
