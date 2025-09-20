@@ -115,15 +115,19 @@ Both the quote and the thought must be clearly related to the input emotion.
         
         # Use the parsed response directly
         emotion_response: EmotionReplyResponse = response.parsed
-        return emotion_response
+        return {
+            "quote": emotion_response.quote,
+            "author": emotion_response.author,
+            "thought": emotion_response.thought
+        }
         
     except Exception as e:
         print(f"Error in get quote thought endpoint: {e}")
-        return EmotionReplyResponse(
+        return{
             quote="Error occurred", 
             author="System", 
             thought="Sorry, I encountered an error while processing your request."
-        )
+        }
 
 @app.post("/get-initial-message")
 async def get_initial_message(req: UserIdRequest):
