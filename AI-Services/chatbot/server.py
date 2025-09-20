@@ -112,9 +112,10 @@ Both the quote and the thought must be clearly related to the input emotion.
                 "response_schema": EmotionReplyResponse,
             },
         )
-        
+
         # Use the parsed response directly
-        emotion_response: EmotionReplyResponse = response.parsed
+        emotion_response = response.parsed
+
         return {
             "quote": emotion_response.quote,
             "author": emotion_response.author,
@@ -124,9 +125,9 @@ Both the quote and the thought must be clearly related to the input emotion.
     except Exception as e:
         print(f"Error in get quote thought endpoint: {e}")
         return{
-            quote="Error occurred", 
-            author="System", 
-            thought="Sorry, I encountered an error while processing your request."
+            "quote":"Error occurred", 
+            "author":"System", 
+            "thought":"Sorry, I encountered an error while processing your request."
         }
 
 @app.post("/get-initial-message")
