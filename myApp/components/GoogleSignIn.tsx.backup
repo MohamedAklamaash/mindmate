@@ -1,4 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useSta  const [request, response, promptAsync] = hasValidClientIds ? Google.useAuthRequest({
+    androidClientId: ANDROID_ID,
+    iosClientId: IOS_ID,
+    webClientId: WEB_ID,
+    scopes: ['openid', 'profile', 'email'],
+    redirectUri: AuthSession.makeRedirectUri({
+      useProxy: true,
+    }),
+  }) : [null, null, async () => {}]; 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,7 +17,6 @@ import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
-
 // Complete the auth session for proper cleanup
 WebBrowser.maybeCompleteAuthSession();
 
@@ -37,13 +44,15 @@ export function GoogleSignIn() {
     iosClientId: IOS_ID,
     webClientId: WEB_ID,
     scopes: ['openid', 'profile', 'email'],
-    redirectUri: AuthSession.makeRedirectUri(),
+    redirectUri: AuthSession.makeRedirectUri({
+      scheme: 'com.anonymous.myApp'
+    }),
   }) : [null, null, async () => {}];
-
-  useEffect(() => {
-    // Hide the status bar on mount
-    // No need to configure GoogleSignin for Expo
-  }, []);
+   useEffect(() => {
+      // Hide the status bar on mount
+<StatusBar hidden={true} />
+      // No need to configure GoogleSignin for Expo
+    }, []);
 
   useEffect(() => {
     if (!hasValidClientIds) return;
@@ -132,31 +141,6 @@ export function GoogleSignIn() {
     }
   };
 
-  const handleSkipForNow = async () => {
-    setLoading(true);
-    try {
-      // Create a user without email (anonymous user)
-      setUser({
-        id: String(Date.now()),
-        email: null, // Keep email as null
-        name: 'Anonymous User',
-        photoURL: null,
-      });
-      
-      console.log('Skipping authentication, proceeding anonymously');
-      
-      // Set user type and proceed to onboarding
-      setUserType('user');
-      setAuthenticated(false);
-      setNeedsNickname(true);
-      setLoading(false);
-    } catch (error) {
-      console.error('Skip for now error:', error);
-      Alert.alert('Error', 'Failed to proceed');
-      setLoading(false);
-    }
-  };
-
   const openGoogleSetupInstructions = async () => {
     if (!hasValidClientIds) {
       Alert.alert(
@@ -170,7 +154,6 @@ export function GoogleSignIn() {
     // Use Expo's Google authentication
     try {
       setLoading(true);
-      console.log('Redirect URI being used:', AuthSession.makeRedirectUri());
       await promptAsync();
     } catch (e) {
       console.error('Google prompt failed', e);
@@ -270,25 +253,6 @@ export function GoogleSignIn() {
                       <View style={styles.buttonContent}>
                         <AntDesign name="user" size={24} color="white" />
                         <Text style={styles.buttonTitle}>Use Demo Mode (For Testing)</Text>
-                      </View>
-                    </LinearGradient>
-                  )}
-                </Pressable>
-
-                {/* Skip for now Button */}
-                <Pressable 
-                  style={styles.buttonWrapper}
-                  onPress={handleSkipForNow}
-                  disabled={loading}
-                >
-                  {({ pressed }) => (
-                    <LinearGradient
-                      colors={['#6B7280', '#9CA3AF']}
-                      style={[styles.gradientButton, loading && styles.gradientButtonDisabled, pressed && styles.gradientButtonPressed]}
-                    >
-                      <View style={styles.buttonContent}>
-                        <AntDesign name="right" size={24} color="white" />
-                        <Text style={styles.buttonTitle}>Skip for now</Text>
                       </View>
                     </LinearGradient>
                   )}

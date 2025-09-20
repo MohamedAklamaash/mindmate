@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import {
   View,
   Text,
@@ -9,11 +10,12 @@ import {
   Linking,
   Alert,
   Platform,
-  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useThemeStore, getThemeColors } from '@/store/themeStore';
+import { useUserStore } from '@/store/userStore';
 import { spotifyService, PodcastData } from '@/services/spotifyService';
 import { appInitializationService } from '@/services/appInitialization';
 
@@ -49,10 +51,15 @@ interface QuickTip {
 type ContextType = 'general' | 'stress' | 'anxiety' | 'depression' | 'motivation' | 'sleep' | 'confidence';
 
 export default function ResourcesScreen() {
+  const quotesFetchedRef = React.useRef(false);
   const [spotifyPodcasts, setSpotifyPodcasts] = useState<PodcastData[]>([]);
   const [podcastLoading, setPodcastLoading] = useState(false);
-  const [isTopicsDropdownOpen, setIsTopicsDropdownOpen] = useState(false);
-  const [currentContext, setCurrentContext] = useState<ContextType>('general');
+  const [currentContext] = useState<ContextType>('general');
+  // Quote states
+  const [aiQuote, setAiQuote] = useState<{ text: string; author: 'Witty Mate' } | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteOfTheDay, setQuoteOfTheDay] = useState<{ text: string; author: string } | null>(null);
+  const [quoteOfTheDayLoading, setQuoteOfTheDayLoading] = useState(false);
   
   // Theme support
   const selectedTheme = useThemeStore((state) => state.selectedTheme);
@@ -100,157 +107,22 @@ export default function ResourcesScreen() {
       isCompleted: true,
       progress: 100,
     },
-    {
-      id: '3',
-      title: 'Sleep Hygiene Guide',
-      instructor: 'Dr. Emily Davis',
-      duration: '30 min',
-      type: 'guide',
-      points: 30,
-      isCompleted: false,
-      progress: 0,
-    },
   ];
 
   // Context-based content
-  const quickTipsByContext: Record<ContextType, QuickTip> = {
-    general: {
-      quote: {
-        text: "The greatest revolution of our generation is the discovery that human beings, by changing the inner attitudes of their minds, can change the outer aspects of their lives.",
-        author: "William James"
-      },
-      article: {
-        title: "5 Simple Daily Habits for Better Mental Health",
-        source: "Psychology Today",
-        url: "https://www.psychologytoday.com/mental-health-habits"
-      },
-      podcast: {
-        title: "The Science of Happiness",
-        host: "Dr. Laurie Santos",
-        duration: "25 min",
-        spotifyUrl: "https://open.spotify.com/show/happiness"
-      }
+  // Fallback static tip used only if Gemini fails
+  const fallbackTip = {
+    quote: {
+      text: "You're not alone — feelings pass and kinder days are ahead.",
+      author: 'Witty Mate',
     },
-    stress: {
-      quote: {
-        text: "You have been assigned this mountain to show others it can be moved.",
-        author: "Mel Robbins"
-      },
-      article: {
-        title: "10 Effective Stress Management Techniques",
-        source: "Harvard Health",
-        url: "https://www.health.harvard.edu/stress-management"
-      },
-      podcast: {
-        title: "Stress Less with Dr. Mark Hyman",
-        host: "Dr. Mark Hyman",
-        duration: "30 min",
-        spotifyUrl: "https://open.spotify.com/show/stress-less"
-      }
+    podcast: {
+      title: 'The Science of Happiness',
+      host: 'Dr. Laurie Santos',
+      duration: '25 min',
+      spotifyUrl: 'https://open.spotify.com/show/happiness',
     },
-    anxiety: {
-      quote: {
-        text: "Anxiety is the dizziness of freedom.",
-        author: "Søren Kierkegaard"
-      },
-      article: {
-        title: "Understanding and Managing Anxiety",
-        source: "Mayo Clinic",
-        url: "https://www.mayoclinic.org/anxiety"
-      },
-      podcast: {
-        title: "The Anxiety Guy Podcast",
-        host: "Dennis Simsek",
-        duration: "35 min",
-        spotifyUrl: "https://open.spotify.com/show/anxiety-guy"
-      }
-    },
-    depression: {
-      quote: {
-        text: "Even the darkest night will end and the sun will rise.",
-        author: "Victor Hugo"
-      },
-      article: {
-        title: "Breaking Through Depression",
-        source: "Mental Health America",
-        url: "https://www.mhanational.org/depression"
-      },
-      podcast: {
-        title: "Depression and Bipolar Support",
-        host: "DBSA",
-        duration: "40 min",
-        spotifyUrl: "https://open.spotify.com/show/dbsa"
-      }
-    },
-    motivation: {
-      quote: {
-        text: "The only impossible journey is the one you never begin.",
-        author: "Tony Robbins"
-      },
-      article: {
-        title: "Building Lasting Motivation",
-        source: "Forbes",
-        url: "https://www.forbes.com/motivation"
-      },
-      podcast: {
-        title: "Motivation Daily",
-        host: "Motivation Ark",
-        duration: "20 min",
-        spotifyUrl: "https://open.spotify.com/show/motivation-daily"
-      }
-    },
-    sleep: {
-      quote: {
-        text: "Sleep is the best meditation.",
-        author: "Dalai Lama"
-      },
-      article: {
-        title: "The Science of Better Sleep",
-        source: "Sleep Foundation",
-        url: "https://www.sleepfoundation.org"
-      },
-      podcast: {
-        title: "Sleep With Me",
-        host: "Drew Ackerman",
-        duration: "60 min",
-        spotifyUrl: "https://open.spotify.com/show/sleep-with-me"
-      }
-    },
-    confidence: {
-      quote: {
-        text: "Believe you can and you're halfway there.",
-        author: "Theodore Roosevelt"
-      },
-      article: {
-        title: "Building Self-Confidence",
-        source: "Psychology Today",
-        url: "https://www.psychologytoday.com/confidence"
-      },
-      podcast: {
-        title: "The Confidence Code",
-        host: "Kay & Claire",
-        duration: "45 min",
-        spotifyUrl: "https://open.spotify.com/show/confidence-code"
-      }
-    }
-  };
-
-  const topics = [
-    { key: 'general' as ContextType, label: 'General Wellness', icon: '💚' },
-    { key: 'stress' as ContextType, label: 'Stress Relief', icon: '🧘' },
-    { key: 'anxiety' as ContextType, label: 'Anxiety Support', icon: '💙' },
-    { key: 'depression' as ContextType, label: 'Mood Boost', icon: '🌟' },
-    { key: 'motivation' as ContextType, label: 'Motivation', icon: '🚀' },
-    { key: 'sleep' as ContextType, label: 'Better Sleep', icon: '😴' },
-    { key: 'confidence' as ContextType, label: 'Self-Confidence', icon: '💪' }
-  ];
-
-  const currentTip = quickTipsByContext[currentContext];
-
-  const updateQuickTips = (context: ContextType) => {
-    setCurrentContext(context);
-    setIsTopicsDropdownOpen(false);
-  };
+  } as const;
 
   // Fetch health podcast data from Spotify
   const fetchHealthPodcastData = async () => {
@@ -283,6 +155,16 @@ export default function ResourcesScreen() {
         
         // Then fetch podcast data
         await fetchHealthPodcastData();
+
+        // Schedule a single combined quote fetch after the current tick so the
+        // fetch function (declared later in this component) is defined.
+        setTimeout(() => {
+          try {
+            fetchQuoteCombined();
+          } catch (e) {
+            console.error('Error scheduling initial quote fetch:', e);
+          }
+        }, 0);
       } catch (error) {
         console.error('Failed to initialize app or fetch podcasts:', error);
         // Still try to fetch podcasts even if initialization fails
@@ -292,6 +174,116 @@ export default function ResourcesScreen() {
 
     initializeAndFetch();
   }, []);
+
+  // Listen for the app-open event emitted by AppOpenHandler and refresh quotes once
+  useEffect(() => {
+    const listener = DeviceEventEmitter.addListener('appOpened', (payload) => {
+      // Log incoming payload and fetch fresh quotes when the app open/exit handler runs
+      try {
+        console.log('Received appOpened event payload:', payload);
+
+        // If the payload includes an emotion_sentiment (from app-exit), pass it through
+        // so the combined fetch uses the server-provided emotion. This also ensures
+        // we call the fetch even when the server returns [null, null] by sanitizing
+        // that to 'neutral'.
+        const serverEmotion = payload && Object.prototype.hasOwnProperty.call(payload, 'emotion_sentiment')
+          ? payload.emotion_sentiment
+          : undefined;
+
+        fetchQuoteCombined(serverEmotion);
+      } catch (e) {
+        console.error('Error refreshing quotes on appOpened event:', e);
+      }
+    });
+
+    return () => listener.remove();
+  }, []);
+
+  // Combined fetch that calls the endpoint once and sets both Quote of the Day
+  // and Daily Inspiration (thought). Uses a ref to avoid duplicate concurrent calls.
+  const fetchQuoteCombined = async (emotionOverride?: string | string[]) => {
+    // If an explicit emotion is provided, force a fetch (useful when app-exit reports emotion).
+    if (quotesFetchedRef.current && emotionOverride === undefined) {
+      console.log('Quotes already fetched in this session, skipping combined fetch.');
+      return;
+    }
+
+    // Mark as fetched to avoid duplicate background fetches; explicit emotionOverride still triggers.
+    quotesFetchedRef.current = true;
+
+    // Determine emotion: override > store > neutral
+    const rawFromStore = useUserStore.getState().currentEmotion ?? 'neutral';
+    let currentEmotionRaw = emotionOverride ?? rawFromStore ?? 'neutral';
+
+    // Sanitize emotion when server returns arrays like [null, null] or empty values.
+    // If it's an array, pick the first non-empty string; otherwise coerce to string.
+    const sanitizeEmotion = (val: any): string => {
+      if (Array.isArray(val)) {
+        for (const item of val) {
+          if (typeof item === 'string' && item.trim().length > 0) return item.trim();
+        }
+        return 'neutral';
+      }
+      if (typeof val === 'string') {
+        return val.trim().length > 0 ? val.trim() : 'neutral';
+      }
+      // for null/undefined/other, fallback to neutral
+      return 'neutral';
+    };
+
+    const currentEmotion = sanitizeEmotion(currentEmotionRaw);
+    console.log('Sanitized emotion for get-quote-thought:', currentEmotion);
+    setQuoteLoading(true);
+    setQuoteOfTheDayLoading(true);
+
+    try {
+  const requestBody = { emotion: currentEmotion };
+      console.log('get-quote-thought combined request body:', requestBody);
+
+      const res = await fetch('https://mind-mate-two-tau.vercel.app/get-quote-thought', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('get-quote-thought combined response status:', res.status, 'ok:', res.ok);
+      const rawText = await res.text();
+      console.log('get-quote-thought combined raw body text:', rawText);
+
+      let payload: any = {};
+      try {
+        payload = rawText ? JSON.parse(rawText) : {};
+      } catch (parseErr) {
+        console.error('Failed to parse get-quote-thought combined JSON:', parseErr);
+        payload = {};
+      }
+
+      console.log('get-quote-thought combined parsed payload:', payload);
+
+      if (!res.ok) {
+        console.warn('get-quote-thought combined endpoint returned error', res.status, payload);
+        setQuoteOfTheDay({ text: fallbackTip.quote.text, author: fallbackTip.quote.author });
+        setAiQuote({ text: fallbackTip.quote.text, author: fallbackTip.quote.author });
+      } else {
+        // payload: { quote, author, thought }
+        setQuoteOfTheDay({ text: payload.quote || fallbackTip.quote.text, author: payload.author || fallbackTip.quote.author });
+
+  const thoughtText = payload.thought || payload.quote || fallbackTip.quote.text;
+  // Force Daily Inspiration author to 'Witty Mate' per design decision
+  const thoughtAuthor = 'Witty Mate';
+  setAiQuote({ text: thoughtText, author: thoughtAuthor });
+      }
+    } catch (err) {
+      console.error('Failed to fetch combined quote:', err);
+      setQuoteOfTheDay({ text: fallbackTip.quote.text, author: fallbackTip.quote.author });
+      setAiQuote({ text: fallbackTip.quote.text, author: fallbackTip.quote.author });
+    } finally {
+      setQuoteLoading(false);
+      setQuoteOfTheDayLoading(false);
+    }
+  };
+
+
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -378,32 +370,6 @@ export default function ResourcesScreen() {
     });
   };
 
-  const getTopicIcon = (context: ContextType): string => {
-    const iconMap: Record<ContextType, string> = {
-      general: 'heart',
-      stress: 'alert-circle',
-      anxiety: 'brain',
-      depression: 'weather-rainy',
-      motivation: 'fire',
-      sleep: 'sleep',
-      confidence: 'trophy'
-    };
-    return iconMap[context];
-  };
-
-  const getTopicLabel = (context: ContextType): string => {
-    const labelMap: Record<ContextType, string> = {
-      general: 'General Wellness',
-      stress: 'Stress Relief',
-      anxiety: 'Anxiety Support',
-      depression: 'Depression Help',
-      motivation: 'Motivation',
-      sleep: 'Better Sleep',
-      confidence: 'Build Confidence'
-    };
-    return labelMap[context];
-  };
-
   return (
     <LinearGradient colors={getBackgroundGradient()} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -416,24 +382,33 @@ export default function ResourcesScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Health & Wellness Tips</Text>
-              <Pressable 
-                style={[styles.dropdownButton, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}
-                onPress={() => setIsTopicsDropdownOpen(true)}
-              >
-                <MaterialCommunityIcons 
-                  name={getTopicIcon(currentContext) as any} 
-                  size={18} 
-                  color={themeColors.text} 
-                />
-                <Text style={[styles.dropdownButtonText, { color: themeColors.text }]}>
-                  {getTopicLabel(currentContext)}
-                </Text>
-                <MaterialCommunityIcons 
-                  name="chevron-down" 
-                  size={16} 
-                  color={themeColors.textMuted} 
-                />
-              </Pressable>
+            </View>
+
+            {/* Quote of the Day */}
+            <View style={[styles.card, { backgroundColor: themeColors.surface}]}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#F0F9FF' : '#FEF3C7' }]}>
+                  <MaterialCommunityIcons 
+                    name="comment-quote-outline" 
+                    size={20} 
+                    color={selectedTheme === 'forest' ? "#0EA5E9" : "#F59E0B"} 
+                  />
+                </View>
+                <Text style={[styles.cardTitle, { color: themeColors.text }]}>Quote of the Day</Text>
+              </View>
+              {quoteOfTheDayLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={themeColors.primary} />
+                  <Text style={[styles.loadingText, { color: themeColors.textMuted }]}>Loading quote...</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={[styles.quote, { color: themeColors.textSecondary }]}>
+                    "{(quoteOfTheDay && quoteOfTheDay.text) || fallbackTip.quote.text}"
+                  </Text>
+                  <Text style={[styles.author, { color: themeColors.textMuted }]}>— {(quoteOfTheDay && quoteOfTheDay.author) || fallbackTip.quote.author}</Text>
+                </>
+              )}
             </View>
 
             {/* Daily Inspiration */}
@@ -448,35 +423,31 @@ export default function ResourcesScreen() {
                 </View>
                 <Text style={[styles.cardTitle, { color: themeColors.text }]}>Daily Inspiration</Text>
               </View>
-              <Text style={[styles.quote, { color: themeColors.textSecondary }]}>"{currentTip.quote.text}"</Text>
-              <Text style={[styles.author, { color: themeColors.textMuted }]}>— {currentTip.quote.author}</Text>
-            </View>
-
-            {/* Recommended Reading */}
-            <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-              <View style={styles.cardHeader}>
-                <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#DCFCE7' : '#DBEAFE' }]}>
-                  <MaterialCommunityIcons 
-                    name="file-document" 
-                    size={20} 
-                    color={selectedTheme === 'forest' ? themeColors.secondary : "#3B82F6"} 
-                  />
+              {quoteLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={themeColors.primary} />
+                  <Text style={[styles.loadingText, { color: themeColors.textMuted }]}>Loading inspiration...</Text>
                 </View>
-                <Text style={[styles.cardTitle, { color: themeColors.text }]}>Recommended Reading</Text>
-              </View>
-              <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{currentTip.article.title}</Text>
-              <View style={styles.cardFooter}>
-                <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>{currentTip.article.source}</Text>
-                <Pressable 
-                  style={[styles.linkButton, { backgroundColor: themeColors.primary }]} 
-                  onPress={() => openLink(currentTip.article.url)}
-                >
-                  <Text style={[styles.linkButtonText, { color: themeColors.primaryText }]}>Read Article</Text>
-                </Pressable>
-              </View>
+              ) : (
+                <>
+                  <Text style={[styles.quote, { color: themeColors.textSecondary }]}>
+                    "{(aiQuote && aiQuote.text) || fallbackTip.quote.text}"
+                  </Text>
+                  <Text style={[styles.author, { color: themeColors.textMuted }]}>— {(aiQuote && aiQuote.author) || fallbackTip.quote.author}</Text>
+                </>
+              )}
             </View>
 
-            {/* Podcast Recommendations Carousel */}
+            {/* Recommended Reading section removed per request */}
+
+            {/* Podcast was moved into Available Courses as the first tab */}
+          </View>
+
+          {/* Available Courses: Listen & Learn followed by Courses */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Available Courses</Text>
+
+            {/* Podcast carousel shown first */}
             <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
               <View style={styles.cardHeader}>
                 <View style={[styles.iconContainer, { backgroundColor: selectedTheme === 'forest' ? '#DCFCE7' : '#D1FAE5' }]}>
@@ -496,7 +467,7 @@ export default function ResourcesScreen() {
                 </View>
                 <Text style={[styles.cardTitle, { color: themeColors.text }]}>Listen & Learn</Text>
               </View>
-              
+
               {podcastLoading ? (
                 <View style={styles.loadingContainer}>
                   <Text style={[styles.cardContent, { color: themeColors.textMuted }]}>Loading podcast recommendations...</Text>
@@ -537,12 +508,12 @@ export default function ResourcesScreen() {
                 </ScrollView>
               ) : (
                 <>
-                  <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{currentTip.podcast.title}</Text>
+                  <Text style={[styles.cardContent, { color: themeColors.textSecondary }]}>{fallbackTip.podcast.title}</Text>
                   <View style={styles.cardFooter}>
-                    <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>by {currentTip.podcast.host} • {currentTip.podcast.duration}</Text>
+                    <Text style={[styles.sourceText, { color: themeColors.textMuted }]}>by {fallbackTip.podcast.host} • {fallbackTip.podcast.duration}</Text>
                     <Pressable 
                       style={[styles.linkButton, { backgroundColor: themeColors.secondary }]} 
-                      onPress={() => openLink(currentTip.podcast.spotifyUrl)}
+                      onPress={() => openLink(fallbackTip.podcast.spotifyUrl)}
                     >
                       <MaterialCommunityIcons name="volume-high" size={12} color={themeColors.secondaryText} />
                       <Text style={[styles.linkButtonText, { color: themeColors.secondaryText }]}>Listen</Text>
@@ -551,52 +522,49 @@ export default function ResourcesScreen() {
                 </>
               )}
             </View>
-          </View>
 
-          {/* Available Courses */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Available Courses</Text>
+            {/* Then show courses (each course has its own card) */}
             {availableCourses.map((course) => (
               <View key={course.id} style={[styles.courseCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-                <View style={styles.courseHeader}>
-                  <View style={[styles.courseIconContainer, { backgroundColor: themeColors.backgroundSecondary }]}>
-                    <MaterialCommunityIcons 
-                      name={getIcon(course.type) as any} 
-                      size={24} 
-                      color={getIconColor(course.type, selectedTheme)} 
-                    />
-                  </View>
-                  <View style={styles.courseInfo}>
-                    <Text style={[styles.courseTitle, { color: themeColors.text }]}>{course.title}</Text>
-                    <Text style={[styles.courseInstructor, { color: themeColors.textSecondary }]}>by {course.instructor}</Text>
-                    <Text style={[styles.courseDuration, { color: themeColors.textMuted }]}>{course.duration}</Text>
-                  </View>
-                  <View style={styles.courseActions}>
-                    <View style={[styles.pointsBadge, { backgroundColor: themeColors.accent }]}>
-                      <Text style={[styles.pointsText, { color: themeColors.accentText }]}>+{course.points} pts</Text>
+                  <View style={styles.courseHeader}>
+                    <View style={[styles.courseIconContainer, { backgroundColor: themeColors.backgroundSecondary }]}>
+                      <MaterialCommunityIcons 
+                        name={getIcon(course.type) as any} 
+                        size={24} 
+                        color={getIconColor(course.type, selectedTheme)} 
+                      />
                     </View>
-                    {course.isCompleted && (
-                      <View style={styles.completedContainer}>
-                        <MaterialCommunityIcons name="check-circle" size={12} color="#10B981" />
-                        <Text style={styles.completedText}>Completed</Text>
+                    <View style={styles.courseInfo}>
+                      <Text style={[styles.courseTitle, { color: themeColors.text }]}>{course.title}</Text>
+                      <Text style={[styles.courseInstructor, { color: themeColors.textSecondary }]}>by {course.instructor}</Text>
+                      <Text style={[styles.courseDuration, { color: themeColors.textMuted }]}>{course.duration}</Text>
+                    </View>
+                    <View style={styles.courseActions}>
+                      <View style={[styles.pointsBadge, { backgroundColor: themeColors.accent }]}>
+                        <Text style={[styles.pointsText, { color: themeColors.accentText }]}>+{course.points} pts</Text>
                       </View>
-                    )}
+                      {course.isCompleted && (
+                        <View style={styles.completedContainer}>
+                          <MaterialCommunityIcons name="check-circle" size={12} color="#10B981" />
+                          <Text style={styles.completedText}>Completed</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
+                  
+                  {!course.isCompleted && course.progress > 0 && (
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressHeader}>
+                        <Text style={styles.progressLabel}>Progress</Text>
+                        <Text style={styles.progressPercentage}>{course.progress}%</Text>
+                      </View>
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${course.progress}%` }]} />
+                      </View>
+                    </View>
+                  )}
                 </View>
-                
-                {!course.isCompleted && course.progress > 0 && (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressHeader}>
-                      <Text style={styles.progressLabel}>Progress</Text>
-                      <Text style={styles.progressPercentage}>{course.progress}%</Text>
-                    </View>
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${course.progress}%` }]} />
-                    </View>
-                  </View>
-                )}
-              </View>
-            ))}
+              ))}
           </View>
 
           {/* Crisis Support */}
@@ -619,56 +587,6 @@ export default function ResourcesScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
-
-      {/* Topic Selection Modal */}
-      <Modal
-        visible={isTopicsDropdownOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsTopicsDropdownOpen(false)}
-      >
-        <Pressable 
-          style={styles.modalOverlay} 
-          onPress={() => setIsTopicsDropdownOpen(false)}
-        >
-          <Pressable style={[styles.dropdownModal, { backgroundColor: themeColors.surface }]}>
-            <Text style={[styles.dropdownTitle, { color: themeColors.text }]}>Choose Your Focus</Text>
-            
-            {(['general', 'stress', 'anxiety', 'depression', 'motivation', 'sleep', 'confidence'] as ContextType[]).map((context) => (
-              <Pressable
-                key={context}
-                style={[
-                  styles.topicOption,
-                  currentContext === context && [styles.topicOptionActive, { backgroundColor: themeColors.primary + '20' }]
-                ]}
-                onPress={() => {
-                  setCurrentContext(context);
-                  setIsTopicsDropdownOpen(false);
-                }}
-              >
-                <MaterialCommunityIcons 
-                  name={getTopicIcon(context) as any} 
-                  size={24} 
-                  color={currentContext === context ? themeColors.primary : themeColors.textMuted} 
-                />
-                <Text style={[
-                  styles.topicLabel, 
-                  { color: currentContext === context ? themeColors.primary : themeColors.text }
-                ]}>
-                  {getTopicLabel(context)}
-                </Text>
-              </Pressable>
-            ))}
-
-            <Pressable 
-              style={[styles.closeButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => setIsTopicsDropdownOpen(false)}
-            >
-              <Text style={[styles.closeButtonText, { color: themeColors.primaryText }]}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </LinearGradient>
   );
 }
@@ -771,6 +689,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#9CA3AF',
   },
   podcastCarouselContainer: {
     paddingHorizontal: 0,
@@ -1028,5 +951,30 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  tabsHeader: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tabButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  tabButtonActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  tabButtonTextActive: {
+    color: '#4F46E5',
   },
 });

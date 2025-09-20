@@ -99,7 +99,7 @@ export function QuestionHeader({
     <View style={styles.headerContainer}>
       {showBack && (
         <TouchableOpacity style={styles.headerButton} onPress={handleBack}>
-          <AntDesign name="arrowleft" size={24} color="#374151" />
+          <AntDesign name="left" size={24} color="#374151" />
         </TouchableOpacity>
       )}
       

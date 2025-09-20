@@ -33,6 +33,7 @@ type UserStore = {
   needsNickname: boolean;
   onboardingStage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen';
   u_id: string | null; // Persistent user ID from Firestore
+  currentEmotion: string | null; // Current emotion from app-exit analysis
   setUserType: (type: 'user' | 'therapist') => void;
   setUser: (user: User | null) => void;
   setAuthenticated: (isAuthenticated: boolean) => void;
@@ -40,6 +41,7 @@ type UserStore = {
   setOnboardingStage: (stage: 'none' | 'namePage' | 'questionOne' | 'questionTwo' | 'questionThree' | 'questionFour' | 'questionFive' | 'questionSix' | 'questionSeven' | 'questionEight' | 'questionNine' | 'questionTen') => void;
   setUserFirestoreId: (firestoreId: string) => void; // Add method to set Firestore ID
   setUserId: (u_id: string) => void; // Add method to set persistent user ID
+  setCurrentEmotion: (emotion: string | null) => void; // Add method to set current emotion
   getUserEmail: () => string | null; // Helper method to get user email
   signOut: () => void;
 };
@@ -55,6 +57,7 @@ export const useUserStore = create<UserStore>()(
       needsNickname: false,
       onboardingStage: 'none',
       u_id: null,
+      currentEmotion: null,
       setUserType: (type) => set({ userType: type }),
       setUser: (user) => {
         console.log('Setting user in store with email:', user?.email); // Debug log
@@ -67,11 +70,12 @@ export const useUserStore = create<UserStore>()(
         user: state.user ? { ...state.user, firestoreId } : null 
       })),
       setUserId: (u_id) => set({ u_id }),
+      setCurrentEmotion: (emotion) => set({ currentEmotion: emotion }),
       getUserEmail: () => {
         const state = get();
         return state.user?.email || null;
       },
-      signOut: () => set({ user: null, isAuthenticated: false, u_id: null }),
+      signOut: () => set({ user: null, isAuthenticated: false, u_id: null, currentEmotion: null }),
     }),
     {
       name: 'user-storage',

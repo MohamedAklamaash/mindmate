@@ -9,6 +9,83 @@ import { saveUserWithAnswers, updateUserAnswers } from '../../../services/fireba
 import { QuestionHeader } from './QuestionHeader';
 import { StatusBar } from 'expo-status-bar';
 
+// Backend server URL (matches other services)
+const SERVER_URL = 'https://mind-mate-two-tau.vercel.app';
+
+// Convert answers object to a plain text message that the ChatRequest expects
+function formatAnswersToText(answers: any) {
+  const serializeValue = (value: any): string => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (Array.isArray(value)) {
+      return value.map(serializeValue).filter(Boolean).join(', ');
+    }
+    if (typeof value === 'object') {
+      // Prefer common display keys
+      if ('label' in value && (typeof value.label === 'string' || typeof value.label === 'number')) return String(value.label);
+      if ('value' in value && (typeof value.value === 'string' || typeof value.value === 'number')) return String(value.value);
+
+      // If object looks like a mapping of choices, flatten it
+      try {
+        const entries = Object.entries(value).map(([k, v]) => `${k}: ${serializeValue(v)}`);
+        return entries.join(', ');
+      } catch (e) {
+        return JSON.stringify(value);
+      }
+    }
+    return String(value);
+  };
+
+  try {
+    if (!answers || typeof answers !== 'object') return String(answers || '');
+    const parts: string[] = [];
+    for (const [key, value] of Object.entries(answers)) {
+      const serialized = serializeValue(value);
+      parts.push(`${key}: ${serialized}`);
+    }
+    return parts.join('\n');
+  } catch (e) {
+    return JSON.stringify(answers);
+  }
+}
+
+// Helper to send answers to backend /store-question-info endpoint
+async function sendAnswersToServer(answers: any, user_id: string) {
+  try {
+    // Format message as plain text (server ChatRequest expects a string)
+    const messageText = formatAnswersToText(answers);
+
+    const payload = {
+      message: messageText,
+      user_id,
+    };
+
+    // Debug: print the exact text that will be sent to the server
+    console.log('Formatted answers (message) being sent to /store-question-info:\n', messageText);
+    console.log('Payload object:', payload);
+
+    const res = await fetch(`${SERVER_URL}/store-question-info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.error('Failed to POST /store-question-info:', res.status);
+      const text = await res.text().catch(() => undefined);
+      console.error('Response text:', text);
+      return false;
+    }
+
+    const data = await res.json();
+    console.log('/store-question-info response:', data);
+    return true;
+  } catch (err) {
+    console.error('Error sending answers to backend:', err);
+    return false;
+  }
+}
+
 const { UsageModule } = NativeModules;
 export default function QuestionTen() {
   const [isLoading, setIsLoading] = useState(false);
@@ -191,11 +268,24 @@ export default function QuestionTen() {
       if (user.firestoreId) {
         await updateUserAnswers(user.firestoreId, answers);
         firestoreId = user.firestoreId;
+        // Send answers to backend using existing firestoreId
+        try {
+          await sendAnswersToServer(answers, firestoreId);
+        } catch (e) {
+          console.warn('Failed to send answers to backend after update:', e);
+        }
       } else {
         // Save new user with answers to Firestore
         firestoreId = await saveUserWithAnswers(userData, answers);
         // Update the user store with the Firestore ID
         setUserFirestoreId(firestoreId);
+
+        // Send answers to backend with the newly created firestoreId
+        try {
+          await sendAnswersToServer(answers, firestoreId);
+        } catch (e) {
+          console.warn('Failed to send answers to backend after create:', e);
+        }
       }
 
       console.log('User data and answers saved successfully with email:', userData.email);

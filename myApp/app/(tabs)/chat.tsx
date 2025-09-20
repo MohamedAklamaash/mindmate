@@ -125,7 +125,7 @@ export default function ChatScreen() {
 
     try {
       console.log("Sending message to server:", userMsg);
-      const res = await fetch("https://mind-mate-delta.vercel.app/chat", {
+      const res = await fetch("https://mind-mate-two-tau.vercel.app//chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg, user_id: u_id || 'anonymous' }),
@@ -197,13 +197,13 @@ export default function ChatScreen() {
         console.log("Recording stopped. File stored at:", uri);
         
         // Create a new filename with MP3 extension
-        const documentsDir = FileSystem.documentDirectory;
+        const documentsDir = (FileSystem as any).documentDirectory;
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const mp3FileName = `recorded_audio_${timestamp}.mp3`;
         const mp3FilePath = `${documentsDir}${mp3FileName}`;
         
         // Copy/Move the recorded file to our desired location with MP3 extension
-        await FileSystem.copyAsync({
+        await (FileSystem as any).copyAsync({
           from: uri,
           to: mp3FilePath,
         });

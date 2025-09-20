@@ -2,14 +2,14 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, doc, updateDoc, getDocs, query, getDoc, deleteDoc } from 'firebase/firestore';
 import { QuestionAnswers } from '../components/ui/questions/AnswerManager';
 
-// Firebase configuration
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyA4u9wYxej-LbKAl7NIbEJTlrt5Y5a5Xvc",
-  authDomain: "mindmate-52779.firebaseapp.com",
-  projectId: "mindmate-52779",
-  storageBucket: "mindmate-52779.firebasestorage.app",
-  messagingSenderId: "772843818203",
-  appId: "1:772843818203:android:95a264b8688342602bd0fe"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
