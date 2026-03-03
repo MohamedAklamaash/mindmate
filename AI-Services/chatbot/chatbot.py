@@ -1,11 +1,11 @@
 from typing import List, Dict, Optional, Any
 from datetime import datetime, date
 import logging
-from chat import ChatCompletionBase
-from prompt_manager import PromptManager
-from custom_promt import SYSTEM_PROMPT_FIRST_MESSAGE
-from structures import Analysis, Summarise, PersonalSummary, ConversationInsights
-from db import DB
+from .chat import ChatCompletionBase
+from .prompt_manager import PromptManager
+from .custom_promt import SYSTEM_PROMPT_FIRST_MESSAGE
+from .structures import Analysis, Summarise, PersonalSummary, ConversationInsights
+from .db import DB
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

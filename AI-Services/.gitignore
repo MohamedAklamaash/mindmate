@@ -11,6 +11,6 @@ __pycache__/
 **/__pycache__/
 *.pyc
 .cache/
-
+venv/
 dummy
-# Ignore any file or folder named .env anywhere
+.cache/

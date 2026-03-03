@@ -7,8 +7,8 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel, ValidationError
 from google import genai
 from google.genai import types
-from structures import Analysis, Summarise, Category
-from custom_promt import *
+from .structures import Analysis, Summarise, Category
+from .custom_promt import *
 
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

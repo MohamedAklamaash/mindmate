@@ -1,18 +1,24 @@
 api_key: AIzaSyBCT4kIppoW6VMRr84pZQD8vG2jnlY-gu8
 buffer_percentage: 0.1
 candidate_count: 1
+firebase:
+  apiKey: AIzaSyA4u9wYxej-LbKAl7NIbEJTlrt5Y5a5Xvc
+  appId: 1:772843818203:android:95a264b8688342602bd0fe
+  authDomain: mindmate-52779.firebaseapp.com
+  messagingSenderId: '772843818203'
+  projectId: mindmate-52779
+  storageBucket: mindmate-52779.firebasestorage.app
 frequency_penalty: 0.0
+local_db_path: .cache/local_db.sqlite
+model_context_window:
+  context_window: 1M tokens
+  max_input_tokens: 1048576
+  max_output_tokens: 8192
+  model_name: gemini-2.5-flash
+  note: Known model
 model_name: gemini-2.5-flash
 presence_penalty: 0.0
 summary_threshold: 11
 temperature: 0.7
 top_k: 40
 top_p: 1.0
-local_db_path: .cache/local_db.sqlite
-firebase:
-  apiKey: "AIzaSyA4u9wYxej-LbKAl7NIbEJTlrt5Y5a5Xvc"
-  authDomain: "mindmate-52779.firebaseapp.com"
-  projectId: "mindmate-52779"
-  storageBucket: "mindmate-52779.firebasestorage.app"
-  messagingSenderId: "772843818203"
-  appId: "1:772843818203:android:95a264b8688342602bd0fe"
