@@ -2,9 +2,9 @@ from typing import List, Dict, Optional, Any
 import logging
 from datetime import datetime
 from pydantic import BaseModel, Field
-from .custom_promt import *
-from .structures import Category
-from .chat import ChatCompletionBase
+from custom_promt import *
+from structures import Category
+from chat import ChatCompletionBase
 
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
