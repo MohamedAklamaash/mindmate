@@ -15,19 +15,11 @@ if not logging.getLogger().handlers:
 logger = logging.getLogger(__name__)
 
 class ChatCompletionBase(ABC):
-    """
-    Base class for chat completion models.
-    Supports config initialization, model invocation, and optional Pydantic request formatting.
-    """
+    """Base class for chat completion models."""
     
     def __init__(self, config_path: str):
-        """
-        Initialize the chat completion model with configuration from a YAML file.
-        
-        Args:
-            config_path (str): Path to the configuration YAML file
-        """
-        self._config_path = config_path  # Store config path for later use
+        """Initialize chat completion model with config."""
+        self._config_path = config_path
         self.config = self._load_config(config_path)
         self.model_name = self.config.get('model_name')
         self.api_key = self.config.get('api_key')

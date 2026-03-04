@@ -1,18 +1,19 @@
-from pydantic import BaseModel , Field
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List
 
 
-# Input structures
 class Analysis(BaseModel):
+    """User query analysis structure."""
     user_query: str
     specialised_prompt: str
     memory: Any
 
 class Summarise(BaseModel):
+    """Chat history summarization structure."""
     chat_history: Any
 
-# Output structures
 class Category(BaseModel):
+    """Message category classification structure."""
     user_message: str
     chat_history: Any
 
@@ -75,3 +76,14 @@ class ConversationInsights(BaseModel):
 class PersonalSummary(BaseModel):
     summary: str
     insights: ConversationInsights
+
+class MoodEntry(BaseModel):
+    date: str
+    emotion: str
+    sentiment: str
+
+class MoodAnalytics(BaseModel):
+    mood_history: List[MoodEntry]
+    dominant_emotion: str
+    sentiment_trend: str
+    total_days: int

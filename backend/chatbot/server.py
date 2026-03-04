@@ -1,14 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from chatbot import ChatBot
 import os
 import yaml
 from google import genai
 from typing import Any
+import threading
+import time
 
-# Load config
 cfg_path = os.path.join(os.path.dirname(__file__), "config.yaml")
 try:
     with open(cfg_path, "r") as f:
@@ -18,8 +19,7 @@ except Exception:
 
 bot = ChatBot(cfg_path)
 
-# FastAPI app
-app = FastAPI(title="Chatbot API", version="1.0")
+app = FastAPI(title="MindMate ChatBot API", version="1.0.0")
 
 origins = [
     "http://localhost:3000",
@@ -33,34 +33,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Request / Response models
 class ChatRequest(BaseModel):
+    """Chat message request model."""
     message: str
     user_id: str
 
 class ChatResponse(BaseModel):
+    """Chat response model."""
     reply: str
 
 class UserIdRequest(BaseModel):
+    """User ID request model."""
     user_id: str
 
 class EmotionRequest(BaseModel):
+    """Emotion analysis request model."""
     emotion: Any
 
 class EmotionReplyResponse(BaseModel):
+    """Quote and thought response model."""
     quote: str
     author: str
     thought: str
 
-# Automatically call "change_initial_message" once every 24 hours (every night)
-import threading
-import time
-
 def schedule_change_initial_message():
+    """Daily initial message scheduler."""
     while True:
         now = datetime.now()
-        # Calculate seconds until next midnight
         next_midnight = (now.replace(hour=0, minute=0, second=0, microsecond=0) + 
                          timedelta(days=1))
         seconds_until_midnight = (next_midnight - now).total_seconds()
@@ -71,15 +70,12 @@ def schedule_change_initial_message():
         except Exception as e:
             print(f"Error changing initial message: {e}")
 
-# Start the scheduler in a background thread
-from datetime import timedelta
 threading.Thread(target=schedule_change_initial_message, daemon=True).start()
 
-# Schedule context clearing for all users every 24 hours
 def schedule_clear_context():
+    """Daily context clearing scheduler."""
     while True:
         now = datetime.now()
-        # Calculate seconds until next midnight
         next_midnight = (now.replace(hour=0, minute=0, second=0, microsecond=0) + 
                          timedelta(days=1))
         seconds_until_midnight = (next_midnight - now).total_seconds()
@@ -90,23 +86,22 @@ def schedule_clear_context():
         except Exception as e:
             print(f"Error clearing context for all users: {e}")
 
-# Start the context clearing scheduler in a background thread
 threading.Thread(target=schedule_clear_context, daemon=True).start()
 
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Health check endpoint."""
     return {"status": "Chatbot server is running!", "timestamp": str(datetime.now())}
 
 @app.get("/test")
 async def test():
-    """Simple test endpoint"""
+    """Simple test endpoint."""
     return {"message": "Server is working!"}
 
 @app.post("/get-quote-thought", response_model=EmotionReplyResponse)
 async def get_quote_thought(req: EmotionRequest):
-    """Get the quote and thought of the user."""
+    """Generate quote and thought response."""
     try:
         prompt = f"""
 You are an assistant that provides inspiration based on a user's emotion.
@@ -128,7 +123,6 @@ Both the quote and the thought must be clearly related to the input emotion.
             },
         )
 
-        # Use the parsed response directly
         emotion_response = response.parsed
 
         return {
@@ -147,7 +141,7 @@ Both the quote and the thought must be clearly related to the input emotion.
 
 @app.post("/get-initial-message")
 async def get_initial_message(req: UserIdRequest):
-    """Get initial message for a user"""
+    """Get user initial message."""
     try:
         initial_message = bot.get_initial_message(req.user_id)
         return {"message": initial_message, "user_id": req.user_id, "timestamp": str(datetime.now())}
@@ -157,7 +151,7 @@ async def get_initial_message(req: UserIdRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(req: ChatRequest):
-    """Send a message to chatbot and get reply"""
+    """Send message and get reply."""
     try:
         reply_text = bot.get_reply(req.message, req.user_id)
         return ChatResponse(reply=reply_text)
@@ -167,7 +161,7 @@ async def chat_endpoint(req: ChatRequest):
 
 @app.post("/store-question-info")
 async def store_question_info(req: ChatRequest):
-    """Store question information for a user"""
+    """Store user question information."""
     try:
         bot.store_question_info(req.user_id, req.message)
         return {"status": "Question info stored successfully", "user_id": req.user_id, "timestamp": str(datetime.now())}
@@ -177,7 +171,7 @@ async def store_question_info(req: ChatRequest):
 
 @app.post("/app-exit")
 async def app_exit(req: UserIdRequest):
-    """Handle app exit - summarize and store conversation data"""
+    """Handle app exit and summarization."""
     try:
         notifications , emotion_sentiment = bot.app_exit(req.user_id)
         return {
@@ -193,7 +187,7 @@ async def app_exit(req: UserIdRequest):
 
 @app.post("/hard-reset")
 async def hard_reset(req: UserIdRequest):
-    """Handle hard reset - save conversation to DB and clear all data"""
+    """Hard reset user data."""
     try:
         bot.hard_reset(req.user_id)
         return {"status": "Hard reset completed successfully", "user_id": req.user_id, "timestamp": str(datetime.now())}
@@ -201,10 +195,9 @@ async def hard_reset(req: UserIdRequest):
         print(f"Error in hard reset endpoint: {e}")
         return {"status": "Error during hard reset", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
-
 @app.post("/get-history")
 async def get_history(req: UserIdRequest):
-    """Get conversation history for a user"""
+    """Get user conversation history."""
     try:
         history = bot.get_history(req.user_id)
         return {"history": history, "user_id": req.user_id, "timestamp": str(datetime.now())}
@@ -212,9 +205,28 @@ async def get_history(req: UserIdRequest):
         print(f"Error in get history endpoint: {e}")
         return {"status": "Error getting history", "error": str(e), "user_id": req.user_id, "timestamp": str(datetime.now())}
 
+@app.post("/get-mood-analytics")
+async def get_mood_analytics(req: UserIdRequest):
+    """Get user mood analytics."""
+    try:
+        analytics = bot.get_mood_analytics(req.user_id, days=30)
+        return {
+            "analytics": analytics.dict(),
+            "user_id": req.user_id,
+            "timestamp": str(datetime.now())
+        }
+    except Exception as e:
+        print(f"Error in mood analytics endpoint: {e}")
+        return {
+            "status": "Error getting mood analytics",
+            "error": str(e),
+            "user_id": req.user_id,
+            "timestamp": str(datetime.now())
+        }
+
 @app.post("/reset")
 async def reset(req: UserIdRequest):
-    """Reset conversation history for a user"""
+    """Reset user conversation history."""
     try:
         bot.reset(req.user_id)
         return {"status": "Reset completed successfully", "user_id": req.user_id, "timestamp": str(datetime.now())}
@@ -224,7 +236,7 @@ async def reset(req: UserIdRequest):
 
 @app.get("/endpoints")
 async def list_endpoints():
-    """List all available endpoints and their usage"""
+    """List all available endpoints."""
     endpoints = {
         "GET /": "Health check endpoint",
         "GET /test": "Simple test endpoint", 
@@ -236,6 +248,7 @@ async def list_endpoints():
         "POST /store-question-info": "Store question information for a user (requires: message, user_id)",
         "POST /get-notification": "Get notification for a user (requires: user_id)",
         "POST /get-history": "Get conversation history for a user (requires: user_id)",
+        "POST /get-mood-analytics": "Get mood analytics for a user over the last 30 days (requires: user_id)",
         "POST /reset": "Reset conversation history for a user (requires: user_id)",
         "POST /classify-category": "Classify the category of a user message (requires: message, user_id)",
         "POST /get-specialised-prompt": "Get specialised prompt for a user message (requires: message, user_id)"
@@ -244,11 +257,9 @@ async def list_endpoints():
 
 @app.get("/info")
 async def model_info():
-    """Get chatbot model info"""
+    """Get chatbot model information."""
     return bot.model_info()
-# Hosting code
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
-
-# Export only `app` for Vercel (ASGI)

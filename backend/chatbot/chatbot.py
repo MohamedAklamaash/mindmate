@@ -4,34 +4,32 @@ import logging
 from chat import ChatCompletionBase
 from prompt_manager import PromptManager
 from custom_promt import SYSTEM_PROMPT_FIRST_MESSAGE
-from structures import Analysis, Summarise, PersonalSummary, ConversationInsights
+from structures import Analysis, Summarise, PersonalSummary, ConversationInsights, MoodAnalytics
 from db import DB
+
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
 class ChatBot:
-    """High-level chatbot that integrates classification and response generation."""
+    """High-level chatbot with classification and responses."""
 
     def __init__(self, config_path: str):
-        """Initialize underlying chat model and prompt manager."""
+        """Initialize chat model and prompt manager."""
         self.chat = ChatCompletionBase(config_path)
         self.prompts = PromptManager(self.chat)
-        # Dictionary to store user-specific data by user_id
         self._user_data: Dict[str, Dict[str, Any]] = {}
         
         self.db = DB(config_path)
         
-        # Get context window threshold (80% of max input tokens)
         context_info = self.chat.get_model_context_window()
         max_input_tokens = context_info['max_input_tokens']
-        self._context_threshold = int(max_input_tokens * 0.7)  # 70% threshold
+        self._context_threshold = int(max_input_tokens * 0.7)
        
 
-    # get the user data for a user
     def _get_user_data(self, user_id: str) -> Dict[str, Any]:
-        """Get or initialize user-specific data."""
+        """Get or initialize user data."""
         if user_id not in self._user_data:
             self._user_data[user_id] = {
                 'messages': [],
@@ -42,7 +40,6 @@ class ChatBot:
             }
         return self._user_data[user_id]
 
-    # get the initial message for a user
     def get_initial_message(self, user_id: str) -> str:
         """Set initial message to False."""
         user_data = self._get_user_data(user_id)
@@ -246,6 +243,45 @@ class ChatBot:
         except Exception as e:
             logger.warning(f"app_exit summarisation failed for user {user_id}: {e}")
             return [] , (None, None)
+
+    def get_mood_analytics(self, user_id: str, days: int = 30) -> MoodAnalytics:
+        """Get mood analytics for a user over specified days"""
+        try:
+            mood_data = self.db.get_mood_analytics(days, user_id)
+            
+            if not mood_data:
+                return MoodAnalytics(
+                    mood_history=[],
+                    dominant_emotion="neutral",
+                    sentiment_trend="neutral", 
+                    total_days=0
+                )
+            
+            # Calculate dominant emotion
+            emotions = [entry['emotion'] for entry in mood_data]
+            dominant_emotion = max(set(emotions), key=emotions.count) if emotions else "neutral"
+            
+            # Calculate sentiment trend
+            sentiments = [entry['sentiment'] for entry in mood_data]
+            positive_count = sentiments.count('positive')
+            negative_count = sentiments.count('negative')
+            
+            if positive_count > negative_count:
+                sentiment_trend = "improving"
+            elif negative_count > positive_count:
+                sentiment_trend = "declining"
+            else:
+                sentiment_trend = "stable"
+            
+            return MoodAnalytics(
+                mood_history=mood_data,
+                dominant_emotion=dominant_emotion,
+                sentiment_trend=sentiment_trend,
+                total_days=len(mood_data)
+            )
+        except Exception as e:
+            logger.error(f"Error getting mood analytics for user {user_id}: {e}")
+            return MoodAnalytics(mood_history=[], dominant_emotion="neutral", sentiment_trend="neutral", total_days=0)
 
     def get_notification(self, notification: List[Any]) -> List[Dict[str, str]]:
         """Get the notification to the user."""

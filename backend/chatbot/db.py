@@ -11,19 +11,13 @@ from datetime import datetime
 
 class ServerDB:
     def __init__(self, config_path: str):
-        """
-        Initialize LocalDB with config file path.
-        Uses local_db_path from config.yaml.
-        Ensures the directory for the database exists.
-        """
+        """Initialize LocalDB with config file path."""
         self.config_path = config_path
 
-        # Load config and get local_db_path
         with open(self.config_path, "r") as f:
             config = yaml.safe_load(f)
         self.local_db_path = config.get("local_db_path", ".cache/local_db.sqlite")
 
-        # Ensure the directory for the database exists, falling back to /tmp on read-only FS (e.g., Vercel)
         db_dir = os.path.dirname(self.local_db_path)
         try:
             if db_dir and not os.path.exists(db_dir):
@@ -151,6 +145,40 @@ class ServerDB:
         self.conn.commit()
         return deleted_count
 
+    def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
+        """Get mood data for analytics over last N days"""
+        from datetime import datetime, timedelta
+        
+        now = datetime.now()
+        start_time = now - timedelta(days=days)
+        start_iso = start_time.isoformat()
+        
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            SELECT insights, timestamp
+            FROM summaries
+            WHERE user_id = ? AND timestamp >= ?
+            ORDER BY timestamp DESC
+            ''',
+            (user_id, start_iso)
+        )
+        rows = cursor.fetchall()
+        
+        mood_data = []
+        for insights_text, timestamp in rows:
+            try:
+                insights = json.loads(insights_text) if insights_text else {}
+                if insights.get('overall_emotion') and insights.get('overall_sentiment'):
+                    mood_data.append({
+                        'date': timestamp[:10],  # Extract date part
+                        'emotion': insights['overall_emotion'],
+                        'sentiment': insights['overall_sentiment']
+                    })
+            except:
+                continue
+        return mood_data
+
     def delete_summaries_in_range(self, start_date: str, end_date: str, user_id: str) -> int:
         """
         Delete summaries between start_date and end_date (inclusive of the end day) for a specific user.
@@ -271,6 +299,9 @@ class DB:
 
     def delete_local_summary(self, start_date: str, end_date: str, user_id: str) -> int:
         return self.local_db.delete_summaries_in_range(start_date, end_date, user_id)
+
+    def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
+        return self.local_db.get_mood_analytics(days, user_id)
 
     def delete_local_summary_days(self, days: int, user_id: str) -> int:
         return self.local_db.delete_summaries_last_n_days(days, user_id)
