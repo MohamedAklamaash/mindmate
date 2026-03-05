@@ -1,7 +1,7 @@
 .env
-.env.*
+.env.local
+.env.production
 **/.env
-**/.env.*
 chatbot/test.py
 chatbot/test2.py
 chatbot/test3.py
