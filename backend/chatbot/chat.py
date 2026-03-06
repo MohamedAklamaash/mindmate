@@ -1,3 +1,4 @@
+import os
 import yaml
 import json
 import logging
@@ -9,6 +10,9 @@ from google import genai
 from google.genai import types
 from structures import Analysis, Summarise, Category
 from custom_promt import *
+from dotenv import load_dotenv
+
+load_dotenv()
 
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,7 +26,7 @@ class ChatCompletionBase(ABC):
         self._config_path = config_path
         self.config = self._load_config(config_path)
         self.model_name = self.config.get('model_name')
-        self.api_key = self.config.get('api_key')
+        self.api_key = os.environ.get('GOOGLE_API_KEY') or self.config.get('api_key')
         self.client = self._initialize_client()
         
         # Automatically update config with context window info on initialization

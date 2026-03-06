@@ -9,6 +9,9 @@ from google import genai
 from typing import Any
 import threading
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 cfg_path = os.path.join(os.path.dirname(__file__), "config.yaml")
 try:
@@ -16,6 +19,9 @@ try:
         cfg = yaml.safe_load(f)
 except Exception:
     cfg = {}
+
+# Pull sensitive values from env
+cfg['api_key'] = os.environ.get('GOOGLE_API_KEY', cfg.get('api_key', ''))
 
 bot = ChatBot(cfg_path)
 
