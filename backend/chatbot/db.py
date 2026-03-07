@@ -1,282 +1,148 @@
 import os
-import sqlite3
 import json
-import shutil
-import firebase_admin
-from firebase_admin import credentials, firestore
+import logging
 from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
+
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
+
 from structures import PersonalSummary, ConversationInsights
-import yaml
-from datetime import datetime
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+def _get_pg_conn():
+    url = os.environ["POSTGRES_DB_URL"]
+    return psycopg2.connect(url)
+
 
 class ServerDB:
-    def __init__(self, config_path: str):
-        """Initialize LocalDB with config file path."""
-        self.config_path = config_path
+    """PostgreSQL-backed persistent storage for session summaries."""
 
-        with open(self.config_path, "r") as f:
-            config = yaml.safe_load(f)
-        self.local_db_path = config.get("local_db_path", ".cache/local_db.sqlite")
-
-        db_dir = os.path.dirname(self.local_db_path)
-        try:
-            if db_dir and not os.path.exists(db_dir):
-                os.makedirs(db_dir, exist_ok=True)
-            target_db_path = self.local_db_path
-        except Exception:
-            # Read-only or permission error → use /tmp which is writable in serverless
-            fallback_dir = os.path.join("/tmp", "mindmate")
-            os.makedirs(fallback_dir, exist_ok=True)
-            target_db_path = os.path.join(fallback_dir, "local_db.sqlite")
-            self.local_db_path = target_db_path
-
-        # Connect to SQLite database
-        self.conn = sqlite3.connect(target_db_path)
+    def __init__(self):
         self._setup_tables()
 
     def _setup_tables(self):
-        cursor = self.conn.cursor()
-        # Table for summaries (now includes user_id)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS summaries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                summary TEXT,
-                insights TEXT,
-                timestamp TEXT
-            )
-        ''')
-        self.conn.commit()
+        with _get_pg_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS summaries (
+                        id SERIAL PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        summary TEXT,
+                        insights JSONB,
+                        timestamp TIMESTAMPTZ DEFAULT NOW()
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_summaries_user_id ON summaries(user_id);
+                    CREATE INDEX IF NOT EXISTS idx_summaries_timestamp ON summaries(timestamp);
+                """)
+            conn.commit()
 
-    def insert_summary(self, input: PersonalSummary, user_id: str):
-        """
-        Insert a record into `summaries` using an input that follows the
-        `PersonalSummary` structure (has fields `summary` and `insights`), and user_id.
-
-        - Adds a `timestamp` field (ISO string)
-        - Persists into columns: (user_id TEXT, summary TEXT, insights TEXT, timestamp TEXT)
-        - Returns True if successful, False otherwise
-        """
+    def insert_summary(self, input: PersonalSummary, user_id: str) -> bool:
         try:
-            timestamp_value = datetime.now().isoformat()
-            # input is guaranteed to be PersonalSummary
-            if hasattr(input, "model_dump") and callable(getattr(input, "model_dump")):
-                payload = input.model_dump()
-            else:
-                payload = input.dict()
-            cursor = self.conn.cursor()
-            cursor.execute(
-                '''
-                INSERT INTO summaries (user_id, summary, insights, timestamp)
-                VALUES (?, ?, ?, ?)
-                ''',
-                (user_id, payload["summary"], json.dumps(payload.get("insights", {})), timestamp_value)
-            )
-            self.conn.commit()
+            payload = input.model_dump() if hasattr(input, "model_dump") else input.dict()
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO summaries (user_id, summary, insights) VALUES (%s, %s, %s)",
+                        (user_id, payload["summary"], json.dumps(payload.get("insights", {})))
+                    )
+                conn.commit()
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"insert_summary failed: {e}")
             return False
 
     def get_summaries_last_n_days(self, days: int, user_id: str) -> List[PersonalSummary]:
-        """
-        Return a list of PersonalSummary for the last `days` days excluding today for a specific user.
-        Example: if today is Sep 5 and days=4, returns data from Sep 1 00:00
-        up to (but not including) Sep 5 00:00, ordered from oldest to newest.
-        """
-        from datetime import datetime, timedelta
-
-        # Calculate time window [start, end)
         now = datetime.now()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_time = start_of_today - timedelta(days=days)
-        end_time = start_of_today
 
-        start_iso = start_time.isoformat()
-        end_iso = end_time.isoformat()
+        with _get_pg_conn() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """SELECT summary, insights FROM summaries
+                       WHERE user_id = %s AND timestamp >= %s AND timestamp < %s
+                       ORDER BY timestamp ASC""",
+                    (user_id, start_time, start_of_today)
+                )
+                rows = cur.fetchall()
 
-        cursor = self.conn.cursor()
-        cursor.execute(
-            '''
-            SELECT summary, insights, timestamp
-            FROM summaries
-            WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
-            ORDER BY timestamp ASC
-            ''',
-            (user_id, start_iso, end_iso)
-        )
-        rows = cursor.fetchall()
-
-        results: List[PersonalSummary] = []
-        for summary_text, insights_text, _ts in rows:
+        results = []
+        for row in rows:
             try:
-                insights_payload = json.loads(insights_text) if insights_text else {}
-                # Build ConversationInsights safely; allow partial dicts
-                insights_model = ConversationInsights(**insights_payload) if isinstance(insights_payload, dict) else ConversationInsights()
+                insights_payload = row["insights"] if isinstance(row["insights"], dict) else {}
+                insights_model = ConversationInsights(**insights_payload)
             except Exception:
                 insights_model = ConversationInsights()
-            results.append(PersonalSummary(summary=summary_text or "", insights=insights_model))
-
+            results.append(PersonalSummary(summary=row["summary"] or "", insights=insights_model))
         return results
 
     def delete_summaries_last_n_days(self, days: int, user_id: str) -> int:
-        """
-        Delete summaries from the last `days` days excluding today for a specific user.
-        Returns the number of rows deleted.
-        """
-        from datetime import datetime, timedelta
-
         now = datetime.now()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_time = start_of_today - timedelta(days=days)
-        end_time = start_of_today
 
-        start_iso = start_time.isoformat()
-        end_iso = end_time.isoformat()
-
-        cursor = self.conn.cursor()
-        cursor.execute(
-            '''
-            DELETE FROM summaries
-            WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
-            ''',
-            (user_id, start_iso, end_iso)
-        )
-        deleted_count = cursor.rowcount
-        self.conn.commit()
-        return deleted_count
+        with _get_pg_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM summaries WHERE user_id = %s AND timestamp >= %s AND timestamp < %s",
+                    (user_id, start_time, start_of_today)
+                )
+                deleted = cur.rowcount
+            conn.commit()
+        return deleted
 
     def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
-        """Get mood data for analytics over last N days"""
-        from datetime import datetime, timedelta
-        
-        now = datetime.now()
-        start_time = now - timedelta(days=days)
-        start_iso = start_time.isoformat()
-        
-        cursor = self.conn.cursor()
-        cursor.execute(
-            '''
-            SELECT insights, timestamp
-            FROM summaries
-            WHERE user_id = ? AND timestamp >= ?
-            ORDER BY timestamp DESC
-            ''',
-            (user_id, start_iso)
-        )
-        rows = cursor.fetchall()
-        
+        start_time = datetime.now() - timedelta(days=days)
+
+        with _get_pg_conn() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """SELECT insights, timestamp FROM summaries
+                       WHERE user_id = %s AND timestamp >= %s
+                       ORDER BY timestamp DESC""",
+                    (user_id, start_time)
+                )
+                rows = cur.fetchall()
+
         mood_data = []
-        for insights_text, timestamp in rows:
+        for row in rows:
             try:
-                insights = json.loads(insights_text) if insights_text else {}
-                if insights.get('overall_emotion') and insights.get('overall_sentiment'):
+                insights = row["insights"] if isinstance(row["insights"], dict) else {}
+                if insights.get("overall_emotion") and insights.get("overall_sentiment"):
                     mood_data.append({
-                        'date': timestamp[:10],  # Extract date part
-                        'emotion': insights['overall_emotion'],
-                        'sentiment': insights['overall_sentiment']
+                        "date": row["timestamp"].strftime("%Y-%m-%d"),
+                        "emotion": insights["overall_emotion"],
+                        "sentiment": insights["overall_sentiment"],
                     })
-            except:
+            except Exception:
                 continue
         return mood_data
 
     def delete_summaries_in_range(self, start_date: str, end_date: str, user_id: str) -> int:
-        """
-        Delete summaries between start_date and end_date (inclusive of the end day) for a specific user.
-        Input format: 'dd-mm-YYYY' (e.g., '01-09-2025').
-        The function converts these to ISO timestamps at 00:00:00 and deletes in the
-        range [start_date 00:00, (end_date + 1 day) 00:00).
-        Returns the number of rows deleted.
-        """
-        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(start_date, "%d-%m-%Y")
+        end_dt = datetime.strptime(end_date, "%d-%m-%Y") + timedelta(days=1)
 
-        # Parse dd-mm-YYYY and normalize to start-of-day ISO strings
-        start_dt = datetime.strptime(start_date, "%d-%m-%Y").replace(hour=0, minute=0, second=0, microsecond=0)
-        # end is inclusive day, so move to next day's start to make upper bound exclusive
-        end_dt = datetime.strptime(end_date, "%d-%m-%Y").replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        with _get_pg_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM summaries WHERE user_id = %s AND timestamp >= %s AND timestamp < %s",
+                    (user_id, start_dt, end_dt)
+                )
+                deleted = cur.rowcount
+            conn.commit()
+        return deleted
 
-        start_iso = start_dt.isoformat()
-        end_iso = end_dt.isoformat()
-
-        cursor = self.conn.cursor()
-        cursor.execute(
-            '''
-            DELETE FROM summaries
-            WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
-            ''',
-            (user_id, start_iso, end_iso)
-        )
-        deleted_count = cursor.rowcount
-        self.conn.commit()
-        return deleted_count
-
-class CloudDB:
-    def __init__(self, config_path: str):
-        """
-        Initialize Firestore using firebase-admin.
-        Reads Firebase config from config.yaml (uses projectId). If a service account
-        JSON is available via GOOGLE_APPLICATION_CREDENTIALS, it will be used.
-        """
-        self.config_path = config_path
-        with open(self.config_path, "r") as f:
-            config = yaml.safe_load(f)
-
-        firebase_cfg = (config or {}).get("firebase", {}) or {}
-        self.project_id = firebase_cfg.get("projectId")
-
-        # Initialize app if not already initialized
-        if not firebase_admin._apps:
-            cred: Optional[credentials.Base] = None
-            try:
-                # Prefer explicit service account via env var if present
-                cred = credentials.ApplicationDefault()
-            except Exception:
-                cred = None
-
-            if cred is not None:
-                firebase_admin.initialize_app(cred, {"projectId": self.project_id} if self.project_id else None)
-            else:
-                # Fall back to no credentials (use metadata server or emulator)
-                firebase_admin.initialize_app(options={"projectId": self.project_id} if self.project_id else None)
-
-        try:
-            self.client = firestore.client()
-            self.collection_name = "summary"
-        except Exception as e:
-            print(f"Warning: Could not initialize Firestore client: {e}")
-            self.client = None
-            self.collection_name = "summary"
-
-    def insert_summary(self, input: PersonalSummary, user_id: str) -> bool:
-        try:
-            if self.client is None:
-                print("Warning: Firestore client not available, skipping cloud insert")
-                return False
-                
-            if hasattr(input, "model_dump") and callable(getattr(input, "model_dump")):
-                payload = input.model_dump()
-            else:
-                payload = input.dict()
-
-            doc = {
-                "user_id": user_id,
-                "summary": payload.get("summary", ""),
-                "insights": payload.get("insights", {}),
-                "timestamp": payload.get("timestamp", None)
-            }
-            self.client.collection(self.collection_name).add(doc)
-            return True
-        except Exception:
-            return False
 
 class DB:
-    def __init__(self, config_path: str):
-        """
-        Orchestrator DB that wires both LocalDB and CloudDB. Takes a config path
-        and initializes both databases.
-        """
-        self.config_path = config_path
-        self.local_db = ServerDB(config_path)
-        self.cloud_db = None
+    """Orchestrator: PostgreSQL for summaries, MongoDB for notifications."""
+
+    def __init__(self, config_path: str = None):
+        self.local_db = ServerDB()
 
     def insert_local_summary(self, input: PersonalSummary, user_id: str) -> bool:
         return self.local_db.insert_summary(input, user_id)
@@ -284,24 +150,11 @@ class DB:
     def retreive_local_summary(self, days: int, user_id: str) -> List[PersonalSummary]:
         return self.local_db.get_summaries_last_n_days(days, user_id)
 
-    def to_cloud(self, days: int, user_id: str) -> int:
-        """
-        Upload the last `days` days (excluding today) of local summaries for `user_id`
-        into Firestore collection `summary`. Returns number of inserted documents.
-        """
-        summaries = self.local_db.get_summaries_last_n_days(days, user_id)
-        inserted = 0
-        for summary in summaries:
-            ok = self.cloud_db.insert_summary(summary, user_id)
-            if ok:
-                inserted += 1
-        return inserted
-
     def delete_local_summary(self, start_date: str, end_date: str, user_id: str) -> int:
         return self.local_db.delete_summaries_in_range(start_date, end_date, user_id)
 
-    def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
-        return self.local_db.get_mood_analytics(days, user_id)
-
     def delete_local_summary_days(self, days: int, user_id: str) -> int:
         return self.local_db.delete_summaries_last_n_days(days, user_id)
+
+    def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
+        return self.local_db.get_mood_analytics(days, user_id)
