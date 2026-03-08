@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import psycopg2
 import psycopg2.extras
+from pymongo import MongoClient
 from dotenv import load_dotenv
 
 from structures import PersonalSummary, ConversationInsights
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 def _get_pg_conn():
     url = os.environ["POSTGRES_DB_URL"]
     return psycopg2.connect(url)
+
+
+def _get_mongo_db():
+    client = MongoClient(os.environ["MONGODB_URL"])
+    return client.get_default_database()
 
 
 class ServerDB:
@@ -138,11 +144,53 @@ class ServerDB:
         return deleted
 
 
+class NotificationDB:
+    """MongoDB-backed storage for notifications and chat sessions."""
+
+    def store_notifications(self, user_id: str, notifications: List[Dict]) -> bool:
+        try:
+            if not notifications:
+                return True
+            db = _get_mongo_db()
+            docs = [{"user_id": user_id, "created_at": datetime.utcnow(), **n} for n in notifications]
+            db.notifications.insert_many(docs)
+            return True
+        except Exception as e:
+            logger.warning(f"store_notifications failed: {e}")
+            return False
+
+    def get_notifications(self, user_id: str, limit: int = 50) -> List[Dict]:
+        try:
+            db = _get_mongo_db()
+            cursor = db.notifications.find(
+                {"user_id": user_id},
+                {"_id": 0}
+            ).sort("created_at", -1).limit(limit)
+            return list(cursor)
+        except Exception as e:
+            logger.warning(f"get_notifications failed: {e}")
+            return []
+
+    def store_session(self, user_id: str, session_data: Dict) -> bool:
+        try:
+            db = _get_mongo_db()
+            db.chat_sessions.insert_one({
+                "user_id": user_id,
+                "created_at": datetime.utcnow(),
+                **session_data
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"store_session failed: {e}")
+            return False
+
+
 class DB:
     """Orchestrator: PostgreSQL for summaries, MongoDB for notifications."""
 
     def __init__(self, config_path: str = None):
         self.local_db = ServerDB()
+        self.notification_db = NotificationDB()
 
     def insert_local_summary(self, input: PersonalSummary, user_id: str) -> bool:
         return self.local_db.insert_summary(input, user_id)
@@ -158,3 +206,12 @@ class DB:
 
     def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
         return self.local_db.get_mood_analytics(days, user_id)
+
+    def store_notifications(self, user_id: str, notifications: List[Dict]) -> bool:
+        return self.notification_db.store_notifications(user_id, notifications)
+
+    def get_notifications(self, user_id: str, limit: int = 50) -> List[Dict]:
+        return self.notification_db.get_notifications(user_id, limit)
+
+    def store_session(self, user_id: str, session_data: Dict) -> bool:
+        return self.notification_db.store_session(user_id, session_data)
