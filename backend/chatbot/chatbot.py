@@ -21,7 +21,7 @@ class ChatBot:
         self.prompts = PromptManager(self.chat)
         self._user_data: Dict[str, Dict[str, Any]] = {}
         
-        self.db = DB(config_path)
+        self.db = DB()
         
         context_info = self.chat.get_model_context_window()
         max_input_tokens = context_info['max_input_tokens']
