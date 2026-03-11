@@ -239,7 +239,19 @@ class ChatBot:
             notification = user_data['notification']
             user_data['notification'] = []
             user_data['messages'] = []
-            return self.get_notification(notification) , self.get_emotion_sentiment(user_id)
+            notifications_list = self.get_notification(notification)
+            emotion, sentiment = self.get_emotion_sentiment(user_id)
+            # Persist notifications and session to MongoDB
+            try:
+                self.db.store_notifications(user_id, notifications_list)
+                self.db.store_session(user_id, {
+                    "emotion": emotion,
+                    "sentiment": sentiment,
+                    "notification_count": len(notifications_list),
+                })
+            except Exception as e:
+                logger.warning(f"Failed to persist to MongoDB for user {user_id}: {e}")
+            return notifications_list, (emotion, sentiment)
         except Exception as e:
             logger.warning(f"app_exit summarisation failed for user {user_id}: {e}")
             return [] , (None, None)
