@@ -88,3 +88,21 @@ export interface ModelInfoResponse {
   client_type: string;
   [key: string]: any;
 }
+
+// Mood Analytics Types
+export interface MoodEntry {
+  date: string;
+  emotion: string;
+  sentiment: string;
+}
+
+export interface MoodAnalyticsResponse {
+  analytics: {
+    mood_history: MoodEntry[];
+    dominant_emotion: string;
+    sentiment_trend: string;
+    total_days: number;
+  };
+  user_id: string;
+  timestamp: string;
+}

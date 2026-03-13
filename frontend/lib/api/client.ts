@@ -12,6 +12,7 @@ import type {
   StatusResponse,
   HealthCheckResponse,
   ModelInfoResponse,
+  MoodAnalyticsResponse,
 } from '../types/api';
 
 class APIClient {
@@ -144,6 +145,13 @@ class APIClient {
     return this.request<StatusResponse>(ENDPOINTS.STORE_QUESTION_INFO, {
       method: 'POST',
       body: JSON.stringify({ message, user_id: userId } as ChatRequest),
+    });
+  }
+
+  async getMoodAnalytics(userId: string): Promise<APIResponse<MoodAnalyticsResponse>> {
+    return this.request<MoodAnalyticsResponse>(ENDPOINTS.GET_MOOD_ANALYTICS, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId } as UserIdRequest),
     });
   }
 }

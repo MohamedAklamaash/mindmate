@@ -27,6 +27,7 @@ export const ENDPOINTS = {
   // History
   GET_HISTORY: '/get-history',
   STORE_QUESTION_INFO: '/store-question-info',
+  GET_MOOD_ANALYTICS: '/get-mood-analytics',
 } as const;
 
 export const EMOTION_COLORS = {
