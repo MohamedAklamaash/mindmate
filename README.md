@@ -5,7 +5,9 @@ A production-ready, full-stack AI-powered mental health companion that provides 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)
-![Python](https://img.shields.io/badge/Python-3.14-blue)
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)
+![MongoDB](https://img.shields.io/badge/MongoDB-7-green)
 
 ## 🌟 Features
 
@@ -14,8 +16,8 @@ A production-ready, full-stack AI-powered mental health companion that provides 
 - 🎯 **Category Classification** - Automatic detection of mental health topics
 - 📊 **Emotion Tracking** - Sentiment analysis and emotional insights
 - 💡 **Inspirational Quotes** - Personalized quotes based on emotional state
-- 📅 **Smart Notifications** - Important date reminders from conversations
-- 📖 **Conversation History** - Persistent chat history with summaries
+- 📅 **Smart Notifications** - Important date reminders persisted to MongoDB
+- 📖 **Conversation History** - Persistent chat history with summaries in PostgreSQL
 - 🔄 **Session Management** - Automatic context summarization
 
 ### Frontend Features
@@ -30,15 +32,16 @@ A production-ready, full-stack AI-powered mental health companion that provides 
 
 ### Backend (FastAPI + Google Gemini)
 ```
-AI-Services/
+backend/
 ├── chatbot/
 │   ├── server.py          # FastAPI server
 │   ├── chatbot.py         # Main chatbot logic
 │   ├── chat.py            # Chat completion base
 │   ├── prompt_manager.py  # Prompt management
 │   ├── custom_promt.py    # Specialized prompts
-│   ├── db.py              # Database management
-│   └── structures.py      # Pydantic models
+│   ├── db.py              # PostgreSQL + MongoDB management
+│   ├── structures.py      # Pydantic models
+│   └── config.yaml        # Non-sensitive config (no secrets)
 └── test/
     └── test_endpoint.py   # Comprehensive tests
 ```
@@ -48,6 +51,10 @@ AI-Services/
 frontend/
 ├── app/                   # Next.js App Router
 │   ├── chat/             # Chat interface
+│   ├── dashboard/        # Dashboard
+│   ├── history/          # Conversation history
+│   ├── insights/         # Mood insights
+│   ├── settings/         # Settings
 │   ├── layout.tsx        # Root layout
 │   └── page.tsx          # Home page
 ├── components/           # React components
@@ -61,12 +68,18 @@ frontend/
     └── types/          # TypeScript types
 ```
 
+### Database Architecture
+- **PostgreSQL** — Persistent session summaries with emotion/sentiment insights
+- **MongoDB** — Notifications and chat session metadata
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
 - Google Gemini API key
+- PostgreSQL (Docker recommended)
+- MongoDB (Docker recommended)
 
 ### Option 1: Automated Start (Recommended)
 ```bash
@@ -78,20 +91,21 @@ cd /home/aklamaash/Desktop/MindMate
 
 #### 1. Setup Backend
 ```bash
-cd AI-Services
+cd backend
 
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure API key in chatbot/config.yaml
-# api_key: YOUR_GOOGLE_API_KEY
+# Configure environment
+cp .env.example .env
+# Edit .env with your values
 
 # Start server
-python -m chatbot.server
+uvicorn chatbot.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Backend will run on `http://localhost:8000`
@@ -113,11 +127,21 @@ npm run dev
 
 Frontend will run on `http://localhost:3000`
 
-## 📚 Documentation
+## 🔐 Environment Variables
 
-- **[FRONTEND_PLAN.md](./FRONTEND_PLAN.md)** - Complete frontend architecture and design system
-- **[IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md)** - Step-by-step implementation guide
-- **[frontend/README.md](./frontend/README.md)** - Frontend-specific documentation
+### Backend (`backend/.env`)
+```env
+GOOGLE_API_KEY=your_google_gemini_api_key
+POSTGRES_DB_URL=postgresql://user:password@localhost:5433/mindmate
+MONGODB_URL=mongodb://user:password@localhost:27017/mindmate?authSource=admin
+```
+
+> See `backend/.env.example` for a template. Never commit `.env` to version control.
+
+### Frontend (`frontend/.env.local`)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
 ## 🔌 API Endpoints
 
@@ -135,13 +159,14 @@ Frontend will run on `http://localhost:3000`
 - `POST /get-quote-thought` - Get inspirational quote based on emotion
 
 ### Session Management
-- `POST /app-exit` - Summarize session and get notifications
+- `POST /app-exit` - Summarize session, persist to DB, get notifications
 - `POST /hard-reset` - Complete data reset
 - `POST /reset` - Clear conversation history
 
-### History
+### History & Analytics
 - `POST /get-history` - Retrieve conversation history
 - `POST /store-question-info` - Store question metadata
+- `POST /get-mood-analytics` - Get mood analytics over last 30 days
 
 ## 🎨 Design System
 
@@ -157,15 +182,11 @@ Frontend will run on `http://localhost:3000`
 --accent: oklch(0.7 0.1 150);
 ```
 
-### Typography
-- **Font Family**: Geist Sans (Variable)
-- **Monospace**: Geist Mono (Variable)
-
 ## 🧪 Testing
 
 ### Backend Tests
 ```bash
-cd AI-Services
+cd backend
 python test/test_endpoint.py
 ```
 
@@ -177,10 +198,12 @@ npm run type-check
 
 ## 📦 Deployment
 
-### Backend (Vercel/Railway/Render)
-1. Deploy FastAPI application
-2. Set environment variables (API keys)
-3. Configure CORS for frontend domain
+### Backend (Docker)
+```bash
+cd backend
+docker build -t mindmate-backend .
+docker run -p 8000:8000 --env-file .env mindmate-backend
+```
 
 ### Frontend (Vercel - Recommended)
 1. Push to GitHub
@@ -188,26 +211,13 @@ npm run type-check
 3. Set `NEXT_PUBLIC_API_URL` to backend URL
 4. Deploy
 
-## 🔐 Environment Variables
-
-### Backend (`AI-Services/chatbot/config.yaml`)
-```yaml
-api_key: YOUR_GOOGLE_API_KEY
-model_name: gemini-2.5-flash
-temperature: 0.7
-```
-
-### Frontend (`frontend/.env.local`)
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
 ## 🛠️ Tech Stack
 
 ### Backend
 - **Framework**: FastAPI
 - **AI Model**: Google Gemini 2.5 Flash
-- **Database**: SQLite (local) + Firebase (cloud)
+- **Primary DB**: PostgreSQL (summaries, insights)
+- **Secondary DB**: MongoDB (notifications, sessions)
 - **Validation**: Pydantic
 - **Server**: Uvicorn
 
@@ -224,50 +234,24 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ### ✅ Completed
 - [x] Backend API with all endpoints
+- [x] PostgreSQL for session summaries
+- [x] MongoDB for notifications and sessions
+- [x] Config driven by environment variables (no hardcoded secrets)
 - [x] Frontend with chat interface
 - [x] Type-safe API integration
+- [x] Mood analytics endpoint
 - [x] State management
 - [x] Responsive design
 - [x] Accessibility features
 - [x] Error handling
-- [x] Loading states
-- [x] Documentation
 
 ### 🚧 Future Enhancements
-- [ ] History page with timeline
 - [ ] Insights dashboard with charts
-- [ ] Settings page
 - [ ] Dark mode
 - [ ] Voice input
 - [ ] PWA support
 - [ ] Push notifications
 - [ ] Multi-language support
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🙏 Acknowledgments
-
-- Google Gemini for AI capabilities
-- shadcn/ui for beautiful components
-- Next.js team for excellent framework
-- Mental health professionals for guidance
-
-## 📞 Support
-
-For issues or questions:
-- Open an issue on GitHub
-- Check documentation files
-- Review implementation guide
 
 ## ⚠️ Disclaimer
 
