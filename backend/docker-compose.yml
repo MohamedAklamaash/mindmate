@@ -1,0 +1,14 @@
+# MindMate local development - connects to existing running containers
+# Assumes postgres (port 5433) and mongo (port 27017) are already running
+# Run: docker-compose up mindmate-api
+
+services:
+  mindmate-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - POSTGRES_DB_URL=${POSTGRES_DB_URL}
+      - MONGODB_URL=${MONGODB_URL}
+    network_mode: host
