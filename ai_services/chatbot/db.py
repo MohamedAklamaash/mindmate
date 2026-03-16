@@ -16,18 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 def _get_pg_conn():
-    url = os.environ["POSTGRES_DB_URL"]
-    return psycopg2.connect(url)
+    return psycopg2.connect(os.environ["POSTGRES_DB_URL"])
 
 
 def _get_mongo_db():
-    client = MongoClient(os.environ["MONGODB_URL"])
-    return client.get_default_database()
+    return MongoClient(os.environ["MONGODB_URL"]).get_default_database()
 
 
 class ServerDB:
-    """PostgreSQL-backed persistent storage for session summaries."""
-
     def __init__(self):
         self._setup_tables()
 
@@ -66,22 +62,17 @@ class ServerDB:
         now = datetime.now()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_time = start_of_today - timedelta(days=days)
-
         with _get_pg_conn() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    """SELECT summary, insights FROM summaries
-                       WHERE user_id = %s AND timestamp >= %s AND timestamp < %s
-                       ORDER BY timestamp ASC""",
+                    "SELECT summary, insights FROM summaries WHERE user_id = %s AND timestamp >= %s AND timestamp < %s ORDER BY timestamp ASC",
                     (user_id, start_time, start_of_today)
                 )
                 rows = cur.fetchall()
-
         results = []
         for row in rows:
             try:
-                insights_payload = row["insights"] if isinstance(row["insights"], dict) else {}
-                insights_model = ConversationInsights(**insights_payload)
+                insights_model = ConversationInsights(**(row["insights"] if isinstance(row["insights"], dict) else {}))
             except Exception:
                 insights_model = ConversationInsights()
             results.append(PersonalSummary(summary=row["summary"] or "", insights=insights_model))
@@ -91,7 +82,6 @@ class ServerDB:
         now = datetime.now()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_time = start_of_today - timedelta(days=days)
-
         with _get_pg_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -104,17 +94,13 @@ class ServerDB:
 
     def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
         start_time = datetime.now() - timedelta(days=days)
-
         with _get_pg_conn() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    """SELECT insights, timestamp FROM summaries
-                       WHERE user_id = %s AND timestamp >= %s
-                       ORDER BY timestamp DESC""",
+                    "SELECT insights, timestamp FROM summaries WHERE user_id = %s AND timestamp >= %s ORDER BY timestamp DESC",
                     (user_id, start_time)
                 )
                 rows = cur.fetchall()
-
         mood_data = []
         for row in rows:
             try:
@@ -132,7 +118,6 @@ class ServerDB:
     def delete_summaries_in_range(self, start_date: str, end_date: str, user_id: str) -> int:
         start_dt = datetime.strptime(start_date, "%d-%m-%Y")
         end_dt = datetime.strptime(end_date, "%d-%m-%Y") + timedelta(days=1)
-
         with _get_pg_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -145,8 +130,6 @@ class ServerDB:
 
 
 class NotificationDB:
-    """MongoDB-backed storage for notifications and chat sessions."""
-
     def store_notifications(self, user_id: str, notifications: List[Dict]) -> bool:
         try:
             if not notifications:
@@ -162,11 +145,7 @@ class NotificationDB:
     def get_notifications(self, user_id: str, limit: int = 50) -> List[Dict]:
         try:
             db = _get_mongo_db()
-            cursor = db.notifications.find(
-                {"user_id": user_id},
-                {"_id": 0}
-            ).sort("created_at", -1).limit(limit)
-            return list(cursor)
+            return list(db.notifications.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).limit(limit))
         except Exception as e:
             logger.warning(f"get_notifications failed: {e}")
             return []
@@ -174,11 +153,7 @@ class NotificationDB:
     def store_session(self, user_id: str, session_data: Dict) -> bool:
         try:
             db = _get_mongo_db()
-            db.chat_sessions.insert_one({
-                "user_id": user_id,
-                "created_at": datetime.utcnow(),
-                **session_data
-            })
+            db.chat_sessions.insert_one({"user_id": user_id, "created_at": datetime.utcnow(), **session_data})
             return True
         except Exception as e:
             logger.warning(f"store_session failed: {e}")
@@ -186,8 +161,6 @@ class NotificationDB:
 
 
 class DB:
-    """Orchestrator: PostgreSQL for summaries, MongoDB for notifications."""
-
     def __init__(self, config_path: str = None):
         self.local_db = ServerDB()
         self.notification_db = NotificationDB()

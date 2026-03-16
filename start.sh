@@ -7,7 +7,7 @@ echo "========================="
 echo ""
 
 # Check if we're in the right directory
-if [ ! -d "backend" ] || [ ! -d "frontend" ]; then
+if [ ! -d "ai_services" ] || [ ! -d "frontend" ]; then
     echo "❌ Error: Please run this script from the MindMate root directory"
     exit 1
 fi
@@ -35,7 +35,7 @@ echo ""
 
 # Start backend
 echo "🚀 Starting backend server..."
-cd backend
+cd ai_services
 
 if [ ! -d "venv" ]; then
     echo "❌ Virtual environment not found. Please set up the backend first."

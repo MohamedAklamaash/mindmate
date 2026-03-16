@@ -1,264 +1,186 @@
-# 🧠 MindMate - AI Mental Health Companion
+# MindMate
 
-A production-ready, full-stack AI-powered mental health companion that provides empathetic emotional support through intelligent conversations.
+MindMate is an AI-powered mental health companion that provides empathetic, context-aware conversational support. It tracks emotional patterns over time, surfaces personalized insights, and reminds users of important dates they've shared — all through a clean, calming interface.
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)
-![MongoDB](https://img.shields.io/badge/MongoDB-7-green)
+> MindMate is not a replacement for professional mental health care. If you are in crisis, please contact a qualified healthcare provider or emergency services.
 
-## 🌟 Features
+---
 
-### Core Capabilities
-- 💬 **Intelligent Conversations** - Context-aware AI responses using Google Gemini 2.5 Flash
-- 🎯 **Category Classification** - Automatic detection of mental health topics
-- 📊 **Emotion Tracking** - Sentiment analysis and emotional insights
-- 💡 **Inspirational Quotes** - Personalized quotes based on emotional state
-- 📅 **Smart Notifications** - Important date reminders persisted to MongoDB
-- 📖 **Conversation History** - Persistent chat history with summaries in PostgreSQL
-- 🔄 **Session Management** - Automatic context summarization
+## What it does
 
-### Frontend Features
-- 🎨 **Beautiful UI** - Mental health-focused design with calming colors
-- ⚡ **Real-time Chat** - Smooth animations and typing indicators
-- 📱 **Fully Responsive** - Mobile-first design
-- ♿ **Accessible** - WCAG 2.1 AA compliant
-- 🔒 **Privacy-First** - Local storage with user control
-- 🚀 **Performance Optimized** - Lighthouse score 90+
+- Holds emotionally intelligent conversations powered by Google Gemini 2.5 Flash
+- Automatically classifies the mental health topic of each message (anxiety, grief, stress, etc.) and adapts its tone accordingly
+- Summarizes and compresses conversation history as context grows, so long sessions stay coherent
+- Detects dominant emotion and sentiment at the end of each session and persists them to PostgreSQL
+- Extracts important dates mentioned in conversation (e.g. "my exam is on Friday") and stores them as notifications in MongoDB
+- Surfaces mood analytics — dominant emotion, sentiment trend, and 30-day history — on the insights page
+- Generates personalized inspirational quotes and reflections based on the user's current emotional state
 
-## 🏗️ Architecture
+---
 
-### Backend (FastAPI + Google Gemini)
+## Project structure
+
 ```
-backend/
-├── chatbot/
-│   ├── server.py          # FastAPI server
-│   ├── chatbot.py         # Main chatbot logic
-│   ├── chat.py            # Chat completion base
-│   ├── prompt_manager.py  # Prompt management
-│   ├── custom_promt.py    # Specialized prompts
-│   ├── db.py              # PostgreSQL + MongoDB management
-│   ├── structures.py      # Pydantic models
-│   └── config.yaml        # Non-sensitive config (no secrets)
-└── test/
-    └── test_endpoint.py   # Comprehensive tests
-```
-
-### Frontend (Next.js + TypeScript)
-```
-frontend/
-├── app/                   # Next.js App Router
-│   ├── chat/             # Chat interface
-│   ├── dashboard/        # Dashboard
-│   ├── history/          # Conversation history
-│   ├── insights/         # Mood insights
-│   ├── settings/         # Settings
-│   ├── layout.tsx        # Root layout
-│   └── page.tsx          # Home page
-├── components/           # React components
-│   ├── ui/              # shadcn/ui components
-│   ├── chat/            # Chat components
-│   └── insights/        # Insights components
-└── lib/                 # Core utilities
-    ├── api/            # API client
-    ├── hooks/          # Custom hooks
-    ├── store/          # State management
-    └── types/          # TypeScript types
+MindMate/
+├── ai_services/          # FastAPI backend + AI logic
+│   ├── chatbot/
+│   │   ├── server.py         # FastAPI app and all endpoints
+│   │   ├── chatbot.py        # ChatBot orchestrator
+│   │   ├── chat.py           # Gemini API wrapper (ChatCompletionBase)
+│   │   ├── db.py             # PostgreSQL (ServerDB) + MongoDB (NotificationDB)
+│   │   ├── prompt_manager.py # Category classification and prompt selection
+│   │   ├── custom_promt.py   # System prompts
+│   │   ├── structures.py     # Pydantic models
+│   │   └── config.yaml       # Non-secret config (model params, thresholds)
+│   ├── test/
+│   │   └── test_endpoint.py
+│   ├── .env.example
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+└── frontend/             # Next.js 15 frontend
+    ├── app/
+    │   ├── page.tsx          # Login / role selection
+    │   ├── dashboard/        # Home dashboard
+    │   ├── chat/             # Chat interface
+    │   ├── history/          # Conversation history
+    │   ├── insights/         # Mood and emotion insights
+    │   └── settings/         # Account and data settings
+    ├── components/
+    │   ├── chat/             # ChatInterface, MessageList, ChatInput
+    │   ├── insights/         # QuoteCard
+    │   └── ui/               # shadcn/ui primitives
+    └── lib/
+        ├── api/              # API client (typed fetch wrapper)
+        ├── store/            # Zustand stores (user, chat)
+        ├── hooks/            # useChat
+        └── types/            # API response types
 ```
 
-### Database Architecture
-- **PostgreSQL** — Persistent session summaries with emotion/sentiment insights
-- **MongoDB** — Notifications and chat session metadata
+---
 
-## 🚀 Quick Start
+## Tech stack
+
+### AI Services (backend)
+
+| Layer | Technology |
+|---|---|
+| Framework | FastAPI |
+| AI Model | Google Gemini 2.5 Flash via `google-genai` |
+| Primary database | PostgreSQL 17 — session summaries, emotion/sentiment insights |
+| Secondary database | MongoDB 7 — notifications, chat session metadata |
+| Config | `config.yaml` for model params; secrets via `.env` / environment variables |
+| Validation | Pydantic v2 |
+| Server | Uvicorn |
+| Containerization | Docker |
+
+Key design decisions:
+- `ChatCompletionBase` wraps the Gemini API and handles both free-text and structured (JSON schema) responses
+- `PromptManager` classifies each message into a mental health category and selects a specialized system prompt
+- Context is automatically compressed when it approaches the model's token limit — oldest 20% of messages are summarized and stored
+- At session end (`/app-exit`), the full conversation is summarized, emotion/sentiment is extracted, and notifications are persisted to MongoDB
+
+### Frontend
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 |
+| UI components | shadcn/ui |
+| Animations | Framer Motion |
+| State management | Zustand |
+| Icons | Lucide React |
+
+---
+
+## Getting started
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 18+
 - Google Gemini API key
-- PostgreSQL (Docker recommended)
-- MongoDB (Docker recommended)
+- Running PostgreSQL instance (port 5433) with a `mindmate` database
+- Running MongoDB instance (port 27017) with a `mindmate` database
 
-### Option 1: Automated Start (Recommended)
+### Backend
+
 ```bash
-cd /home/aklamaash/Desktop/MindMate
-./start.sh
-```
-
-### Option 2: Manual Start
-
-#### 1. Setup Backend
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# Install dependencies
+cd ai_services
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your values
-
-# Start server
+cp .env.example .env   # fill in your values
 uvicorn chatbot.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend will run on `http://localhost:8000`
+### Frontend
 
-#### 2. Setup Frontend
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Configure environment
-cp .env.local.example .env.local
-# Edit .env.local if needed
-
-# Start development server
+# .env.local already has NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Frontend will run on `http://localhost:3000`
+Or run both with:
 
-## 🔐 Environment Variables
+```bash
+./start.sh
+```
 
-### Backend (`backend/.env`)
+---
+
+## Environment variables
+
+### `ai_services/.env`
+
 ```env
-GOOGLE_API_KEY=your_google_gemini_api_key
+GOOGLE_API_KEY=your_gemini_api_key
 POSTGRES_DB_URL=postgresql://user:password@localhost:5433/mindmate
 MONGODB_URL=mongodb://user:password@localhost:27017/mindmate?authSource=admin
 ```
 
-> See `backend/.env.example` for a template. Never commit `.env` to version control.
+### `frontend/.env.local`
 
-### Frontend (`frontend/.env.local`)
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-## 🔌 API Endpoints
+---
 
-### Health & Info
-- `GET /` - Health check
-- `GET /test` - Server test
-- `GET /info` - Model information
-- `GET /endpoints` - List all endpoints
+## API endpoints
 
-### Chat
-- `POST /chat` - Send message and get AI reply
-- `POST /get-initial-message` - Get personalized greeting
-
-### Emotions
-- `POST /get-quote-thought` - Get inspirational quote based on emotion
-
-### Session Management
-- `POST /app-exit` - Summarize session, persist to DB, get notifications
-- `POST /hard-reset` - Complete data reset
-- `POST /reset` - Clear conversation history
-
-### History & Analytics
-- `POST /get-history` - Retrieve conversation history
-- `POST /store-question-info` - Store question metadata
-- `POST /get-mood-analytics` - Get mood analytics over last 30 days
-
-## 🎨 Design System
-
-### Color Palette
-```css
-/* Primary - Calming Blue */
---primary: oklch(0.6 0.15 240);
-
-/* Secondary - Warm Purple */
---secondary: oklch(0.65 0.12 290);
-
-/* Accent - Soft Green (Growth) */
---accent: oklch(0.7 0.1 150);
-```
-
-## 🧪 Testing
-
-### Backend Tests
-```bash
-cd backend
-python test/test_endpoint.py
-```
-
-### Frontend Type Check
-```bash
-cd frontend
-npm run type-check
-```
-
-## 📦 Deployment
-
-### Backend (Docker)
-```bash
-cd backend
-docker build -t mindmate-backend .
-docker run -p 8000:8000 --env-file .env mindmate-backend
-```
-
-### Frontend (Vercel - Recommended)
-1. Push to GitHub
-2. Import project in Vercel
-3. Set `NEXT_PUBLIC_API_URL` to backend URL
-4. Deploy
-
-## 🛠️ Tech Stack
-
-### Backend
-- **Framework**: FastAPI
-- **AI Model**: Google Gemini 2.5 Flash
-- **Primary DB**: PostgreSQL (summaries, insights)
-- **Secondary DB**: MongoDB (notifications, sessions)
-- **Validation**: Pydantic
-- **Server**: Uvicorn
-
-### Frontend
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS v4
-- **UI Components**: shadcn/ui
-- **State Management**: Zustand
-- **Animations**: Framer Motion
-- **Icons**: Lucide React
-
-## 📊 Project Status
-
-### ✅ Completed
-- [x] Backend API with all endpoints
-- [x] PostgreSQL for session summaries
-- [x] MongoDB for notifications and sessions
-- [x] Config driven by environment variables (no hardcoded secrets)
-- [x] Frontend with chat interface
-- [x] Type-safe API integration
-- [x] Mood analytics endpoint
-- [x] State management
-- [x] Responsive design
-- [x] Accessibility features
-- [x] Error handling
-
-### 🚧 Future Enhancements
-- [ ] Insights dashboard with charts
-- [ ] Dark mode
-- [ ] Voice input
-- [ ] PWA support
-- [ ] Push notifications
-- [ ] Multi-language support
-
-## ⚠️ Disclaimer
-
-MindMate is an AI companion for emotional support and is not a replacement for professional mental health services. If you're experiencing a mental health crisis, please contact a qualified healthcare provider or emergency services.
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Health check |
+| GET | `/info` | Model info |
+| GET | `/endpoints` | List all endpoints |
+| POST | `/chat` | Send message, get AI reply |
+| POST | `/get-initial-message` | Get personalized greeting |
+| POST | `/get-quote-thought` | Get quote + reflection by emotion |
+| POST | `/app-exit` | Summarize session, persist to DB |
+| POST | `/hard-reset` | Save everything and clear all state |
+| POST | `/reset` | Clear conversation only |
+| POST | `/get-history` | Retrieve conversation history |
+| POST | `/store-question-info` | Store question metadata |
+| POST | `/get-mood-analytics` | 30-day mood analytics |
 
 ---
 
-**Built with ❤️ for mental health awareness**
+## Deployment
 
-*Last Updated: March 2026*
+### Backend (Docker)
+
+```bash
+cd ai_services
+docker build -t mindmate-ai .
+docker run -p 8000:8000 --env-file .env mindmate-ai
+```
+
+### Frontend (Vercel)
+
+1. Push to GitHub
+2. Import in Vercel
+3. Set `NEXT_PUBLIC_API_URL` to your backend URL
+4. Deploy
