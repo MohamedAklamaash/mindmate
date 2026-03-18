@@ -4,7 +4,7 @@
   "private": true,
   "description": "AI-powered mental health companion frontend",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
