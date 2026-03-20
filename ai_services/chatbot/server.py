@@ -1,15 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from chatbot import ChatBot
 import os
 import yaml
+import tempfile
 from google import genai
 from typing import Any
 import threading
 import time
 from dotenv import load_dotenv
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
@@ -28,8 +31,8 @@ app = FastAPI(title="MindMate API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -164,6 +167,29 @@ async def get_mood_analytics(req: UserIdRequest):
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
+@app.post("/upload-document")
+async def upload_document(file: UploadFile = File(...), user_id: str = Form(...)):
+    try:
+        suffix = os.path.splitext(file.filename)[1].lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        if suffix == ".pdf":
+            loader = PyPDFLoader(tmp_path)
+        elif suffix in (".doc", ".docx"):
+            loader = Docx2txtLoader(tmp_path)
+        else:
+            loader = TextLoader(tmp_path)
+        docs = loader.load()
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks = splitter.split_documents(docs)
+        text = "\n\n".join(c.page_content for c in chunks[:20])
+        os.unlink(tmp_path)
+        bot.store_question_info(user_id, f"[Uploaded document: {file.filename}]\n{text}")
+        return {"status": "ok", "chunks": len(chunks), "user_id": user_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
 @app.post("/reset")
 async def reset(req: UserIdRequest):
     try:
@@ -174,5 +200,5 @@ async def reset(req: UserIdRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    port=int(os.environ["PORT"])
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)

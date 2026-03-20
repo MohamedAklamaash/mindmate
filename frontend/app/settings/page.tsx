@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, userName, userRole, clearUser } = useUserStore();
+  const { isAuthenticated, userName, clearUser } = useUserStore();
   const { clearMessages } = useChatStore();
 
   useEffect(() => {
@@ -74,10 +74,6 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Name</p>
                   <p className="text-lg font-medium">{userName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Role</p>
-                  <p className="text-lg font-medium capitalize">{userRole}</p>
                 </div>
               </CardContent>
             </Card>

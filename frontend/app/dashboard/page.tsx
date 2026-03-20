@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { userName, userRole, isAuthenticated, clearUser } = useUserStore();
+  const { userName, isAuthenticated, clearUser } = useUserStore();
   const { messages } = useChatStore();
 
   useEffect(() => {
@@ -48,7 +48,6 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium">{userName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
             </div>
             <Avatar className="h-10 w-10 border-2 border-primary">
               <AvatarFallback className="gradient-primary text-white">
@@ -72,7 +71,7 @@ export default function DashboardPage() {
                 <CardTitle className="text-3xl text-foreground">Welcome back, {userName}!</CardTitle>
               </div>
               <CardDescription className="text-base">
-                {userRole === 'therapist' ? 'Ready to provide support and guidance today?' : "How are you feeling today? Let's talk about it."}
+                How are you feeling today? I&apos;m here to listen.
               </CardDescription>
             </CardHeader>
           </Card>

@@ -154,6 +154,23 @@ class APIClient {
       body: JSON.stringify({ user_id: userId } as UserIdRequest),
     });
   }
+
+  async uploadDocument(file: File, userId: string): Promise<APIResponse<{ status: string; chunks: number }>> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('user_id', userId);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(`${this.baseURL}${ENDPOINTS.UPLOAD_DOCUMENT}`, { method: 'POST', body: form, signal: controller.signal });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      return { data, status: res.status };
+    } catch (e) {
+      clearTimeout(timeoutId);
+      return { error: e instanceof Error ? e.message : 'Upload failed', status: 500 };
+    }
+  }
 }
 
 export const apiClient = new APIClient();
