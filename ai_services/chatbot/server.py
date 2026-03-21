@@ -12,7 +12,7 @@ import threading
 import time
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
