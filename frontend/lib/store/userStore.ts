@@ -14,6 +14,7 @@ interface UserState {
   clearUser: () => void;
 }
 
+// Only persist userId + userName (identity), not chat data
 export const useUserStore = create<UserState>()(
   persist(
     (set) => ({
@@ -27,6 +28,9 @@ export const useUserStore = create<UserState>()(
       setSentiment: (sentiment) => set({ sentiment }),
       clearUser: () => set({ userId: null, userName: null, emotion: null, sentiment: null, isAuthenticated: false }),
     }),
-    { name: USER_ID_KEY }
+    {
+      name: USER_ID_KEY,
+      partialize: (state) => ({ userId: state.userId, userName: state.userName, isAuthenticated: state.isAuthenticated }),
+    }
   )
 );

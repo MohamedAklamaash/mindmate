@@ -106,3 +106,14 @@ export interface MoodAnalyticsResponse {
   user_id: string;
   timestamp: string;
 }
+
+// Session Types
+export interface Session {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  emotion: string | null;
+  sentiment: string | null;
+}

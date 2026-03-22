@@ -7,7 +7,7 @@ import os
 import yaml
 import tempfile
 from google import genai
-from typing import Any
+from typing import Any, Optional
 import threading
 import time
 from dotenv import load_dotenv
@@ -41,12 +41,25 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     user_id: str
+    session_id: str
 
 class ChatResponse(BaseModel):
     reply: str
 
 class UserIdRequest(BaseModel):
     user_id: str
+
+class SessionRequest(BaseModel):
+    user_id: str
+    session_id: str
+
+class CreateSessionRequest(BaseModel):
+    user_id: str
+    title: Optional[str] = "New Chat"
+
+class RegisterRequest(BaseModel):
+    user_id: str
+    name: str
 
 class EmotionRequest(BaseModel):
     emotion: Any
@@ -75,29 +88,129 @@ threading.Thread(target=_schedule, args=(bot.clear_context_for_all_users, "clear
 async def root():
     return {"status": "running", "timestamp": str(datetime.now())}
 
-@app.get("/test")
-async def test():
-    return {"message": "ok"}
-
 @app.get("/info")
 async def model_info():
     return bot.model_info()
 
-@app.get("/endpoints")
-async def list_endpoints():
-    return {"endpoints": {
-        "GET /": "health check",
-        "GET /info": "model info",
-        "POST /chat": "send message",
-        "POST /get-initial-message": "get greeting",
-        "POST /get-quote-thought": "get quote by emotion",
-        "POST /app-exit": "summarise session and persist",
-        "POST /hard-reset": "save all and clear",
-        "POST /reset": "clear conversation",
-        "POST /get-history": "conversation history",
-        "POST /store-question-info": "store question metadata",
-        "POST /get-mood-analytics": "mood analytics (30 days)",
-    }, "timestamp": str(datetime.now())}
+
+# ── User ──────────────────────────────────────────────────────────────────────
+
+@app.post("/register")
+async def register(req: RegisterRequest):
+    try:
+        bot.db.upsert_user(req.user_id, req.name)
+        return {"status": "ok", "user_id": req.user_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/get-user")
+async def get_user(req: UserIdRequest):
+    try:
+        user = bot.db.get_user(req.user_id)
+        return {"user": user, "user_id": req.user_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# ── Sessions ──────────────────────────────────────────────────────────────────
+
+@app.post("/create-session")
+async def create_session(req: CreateSessionRequest):
+    try:
+        session_id = bot.db.create_session(req.user_id, req.title)
+        return {"session_id": session_id, "user_id": req.user_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/get-sessions")
+async def get_sessions(req: UserIdRequest):
+    try:
+        sessions = bot.db.get_sessions(req.user_id)
+        return {"sessions": sessions, "user_id": req.user_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/delete-session")
+async def delete_session(req: SessionRequest):
+    try:
+        bot.db.delete_session(req.session_id)
+        bot.reset(req.session_id)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/get-session-messages")
+async def get_session_messages(req: SessionRequest):
+    try:
+        messages = bot.db.get_session_messages(req.session_id)
+        return {"messages": messages, "session_id": req.session_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# ── Chat ──────────────────────────────────────────────────────────────────────
+
+@app.post("/get-initial-message")
+async def get_initial_message(req: SessionRequest):
+    try:
+        msg = bot.get_initial_message(req.session_id)
+        if msg:
+            bot.db.append_message(req.session_id, {"ai": msg})
+        return {"message": msg, "session_id": req.session_id, "timestamp": str(datetime.now())}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(req: ChatRequest):
+    try:
+        bot.db.append_message(req.session_id, {"user": req.message})
+        reply = bot.get_reply(req.message, req.session_id)
+        bot.db.append_message(req.session_id, {"ai": reply})
+        # Auto-title session from first user message
+        sessions = bot.db.get_sessions(req.user_id)
+        session = next((s for s in sessions if s["id"] == req.session_id), None)
+        if session and session.get("title") == "New Chat":
+            bot.db.update_session_meta(req.session_id, title=req.message[:40])
+        return ChatResponse(reply=reply)
+    except Exception as e:
+        return ChatResponse(reply="Sorry, I encountered an error. Please try again.")
+
+@app.post("/app-exit")
+async def app_exit(req: SessionRequest):
+    try:
+        notifications, emotion_sentiment = bot.app_exit(req.session_id)
+        emotion, sentiment = emotion_sentiment if emotion_sentiment else (None, None)
+        bot.db.update_session_meta(req.session_id, emotion=emotion, sentiment=sentiment)
+        bot.db.store_notifications(req.user_id, req.session_id, notifications)
+        return {"status": "ok", "notifications": notifications, "emotion_sentiment": emotion_sentiment, "session_id": req.session_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/reset")
+async def reset(req: SessionRequest):
+    try:
+        bot.reset(req.session_id)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.post("/hard-reset")
+async def hard_reset(req: SessionRequest):
+    try:
+        bot.hard_reset(req.session_id)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# ── Analytics & Insights ──────────────────────────────────────────────────────
+
+@app.post("/get-mood-analytics")
+async def get_mood_analytics(req: UserIdRequest):
+    try:
+        return {"analytics": bot.get_mood_analytics(req.user_id, days=30).dict(), "user_id": req.user_id}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 @app.post("/get-quote-thought", response_model=EmotionReplyResponse)
 async def get_quote_thought(req: EmotionRequest):
@@ -114,61 +227,18 @@ async def get_quote_thought(req: EmotionRequest):
     except Exception as e:
         return {"quote": "Error occurred", "author": "System", "thought": str(e)}
 
-@app.post("/get-initial-message")
-async def get_initial_message(req: UserIdRequest):
+@app.post("/get-notifications")
+async def get_notifications(req: UserIdRequest):
     try:
-        msg = bot.get_initial_message(req.user_id)
-        return {"message": msg, "user_id": req.user_id, "timestamp": str(datetime.now())}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "user_id": req.user_id}
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest):
-    try:
-        return ChatResponse(reply=bot.get_reply(req.message, req.user_id))
-    except Exception as e:
-        return ChatResponse(reply="Sorry, I encountered an error. Please try again.")
-
-@app.post("/store-question-info")
-async def store_question_info(req: ChatRequest):
-    try:
-        bot.store_question_info(req.user_id, req.message)
-        return {"status": "ok", "user_id": req.user_id}
+        return {"notifications": bot.db.get_notifications(req.user_id)}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-@app.post("/app-exit")
-async def app_exit(req: UserIdRequest):
-    try:
-        notifications, emotion_sentiment = bot.app_exit(req.user_id)
-        return {"status": "ok", "notifications": notifications, "emotion_sentiment": emotion_sentiment, "user_id": req.user_id, "timestamp": str(datetime.now())}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "user_id": req.user_id}
 
-@app.post("/hard-reset")
-async def hard_reset(req: UserIdRequest):
-    try:
-        bot.hard_reset(req.user_id)
-        return {"status": "ok", "user_id": req.user_id}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-@app.post("/get-history")
-async def get_history(req: UserIdRequest):
-    try:
-        return {"history": bot.get_history(req.user_id), "user_id": req.user_id, "timestamp": str(datetime.now())}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-@app.post("/get-mood-analytics")
-async def get_mood_analytics(req: UserIdRequest):
-    try:
-        return {"analytics": bot.get_mood_analytics(req.user_id, days=30).dict(), "user_id": req.user_id, "timestamp": str(datetime.now())}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
+# ── Document Upload ───────────────────────────────────────────────────────────
 
 @app.post("/upload-document")
-async def upload_document(file: UploadFile = File(...), user_id: str = Form(...)):
+async def upload_document(file: UploadFile = File(...), user_id: str = Form(...), session_id: str = Form(...)):
     try:
         suffix = os.path.splitext(file.filename)[1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -185,18 +255,11 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Form(...)
         chunks = splitter.split_documents(docs)
         text = "\n\n".join(c.page_content for c in chunks[:20])
         os.unlink(tmp_path)
-        bot.store_question_info(user_id, f"[Uploaded document: {file.filename}]\n{text}")
-        return {"status": "ok", "chunks": len(chunks), "user_id": user_id}
+        bot.store_question_info(session_id, f"[Uploaded document: {file.filename}]\n{text}")
+        return {"status": "ok", "chunks": len(chunks)}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-@app.post("/reset")
-async def reset(req: UserIdRequest):
-    try:
-        bot.reset(req.user_id)
-        return {"status": "ok", "user_id": req.user_id}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

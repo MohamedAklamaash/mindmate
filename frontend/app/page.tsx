@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUserStore } from '@/lib/store/userStore';
+import { apiClient } from '@/lib/api/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function LoginPage() {
     if (!name.trim()) return;
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setUser(userId, name.trim());
+    apiClient.register(userId, name.trim());
     router.push('/dashboard');
   };
 

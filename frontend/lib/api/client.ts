@@ -1,18 +1,9 @@
 import { API_CONFIG, ENDPOINTS } from '../constants';
 import type {
-  APIResponse,
-  ChatRequest,
-  ChatResponse,
-  UserIdRequest,
-  EmotionRequest,
-  EmotionReplyResponse,
-  InitialMessageResponse,
-  AppExitResponse,
-  HistoryResponse,
-  StatusResponse,
-  HealthCheckResponse,
-  ModelInfoResponse,
-  MoodAnalyticsResponse,
+  APIResponse, ChatRequest, ChatResponse, UserIdRequest,
+  EmotionRequest, EmotionReplyResponse, InitialMessageResponse,
+  AppExitResponse, StatusResponse, HealthCheckResponse,
+  ModelInfoResponse, MoodAnalyticsResponse, Session,
 } from '../types/api';
 
 class APIClient {
@@ -24,148 +15,83 @@ class APIClient {
     this.timeout = API_CONFIG.TIMEOUT;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<APIResponse<T>> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<APIResponse<T>> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers: { 'Content-Type': 'application/json', ...options.headers },
         signal: controller.signal,
       });
-
       clearTimeout(timeoutId);
-
       const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          error: data.error || 'Request failed',
-          status: response.status,
-        };
-      }
-
-      return {
-        data,
-        status: response.status,
-      };
+      return response.ok ? { data, status: response.status } : { error: data.error || 'Request failed', status: response.status };
     } catch (error) {
       clearTimeout(timeoutId);
-      
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          return {
-            error: 'Request timeout',
-            status: 408,
-          };
-        }
-        return {
-          error: error.message,
-          status: 500,
-        };
+        return { error: error.name === 'AbortError' ? 'Request timeout' : error.message, status: error.name === 'AbortError' ? 408 : 500 };
       }
-      
-      return {
-        error: 'Unknown error occurred',
-        status: 500,
-      };
+      return { error: 'Unknown error', status: 500 };
     }
   }
 
-  // Health & Info
-  async healthCheck(): Promise<APIResponse<HealthCheckResponse>> {
-    return this.request<HealthCheckResponse>(ENDPOINTS.HEALTH);
-  }
+  healthCheck = () => this.request<HealthCheckResponse>(ENDPOINTS.HEALTH);
+  getModelInfo = () => this.request<ModelInfoResponse>(ENDPOINTS.MODEL_INFO);
 
-  async getModelInfo(): Promise<APIResponse<ModelInfoResponse>> {
-    return this.request<ModelInfoResponse>(ENDPOINTS.MODEL_INFO);
-  }
+  register = (userId: string, name: string) =>
+    this.request<{ status: string }>(ENDPOINTS.REGISTER, { method: 'POST', body: JSON.stringify({ user_id: userId, name }) });
 
-  // Chat
-  async sendMessage(message: string, userId: string): Promise<APIResponse<ChatResponse>> {
-    return this.request<ChatResponse>(ENDPOINTS.CHAT, {
-      method: 'POST',
-      body: JSON.stringify({ message, user_id: userId } as ChatRequest),
-    });
-  }
+  getUser = (userId: string) =>
+    this.request<{ user: { user_id: string; name: string } }>(ENDPOINTS.GET_USER, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
 
-  async getInitialMessage(userId: string): Promise<APIResponse<InitialMessageResponse>> {
-    return this.request<InitialMessageResponse>(ENDPOINTS.GET_INITIAL_MESSAGE, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId } as UserIdRequest),
-    });
-  }
+  createSession = (userId: string, title = 'New Chat') =>
+    this.request<{ session_id: string }>(ENDPOINTS.CREATE_SESSION, { method: 'POST', body: JSON.stringify({ user_id: userId, title }) });
 
-  // Emotions
-  async getQuoteThought(emotion: string): Promise<APIResponse<EmotionReplyResponse>> {
-    return this.request<EmotionReplyResponse>(ENDPOINTS.GET_QUOTE_THOUGHT, {
-      method: 'POST',
-      body: JSON.stringify({ emotion } as EmotionRequest),
-    });
-  }
+  getSessions = (userId: string) =>
+    this.request<{ sessions: Session[] }>(ENDPOINTS.GET_SESSIONS, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
 
-  // Session Management
-  async appExit(userId: string): Promise<APIResponse<AppExitResponse>> {
-    return this.request<AppExitResponse>(ENDPOINTS.APP_EXIT, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId } as UserIdRequest),
-    });
-  }
+  deleteSession = (userId: string, sessionId: string) =>
+    this.request<StatusResponse>(ENDPOINTS.DELETE_SESSION, { method: 'POST', body: JSON.stringify({ user_id: userId, session_id: sessionId }) });
 
-  async hardReset(userId: string): Promise<APIResponse<StatusResponse>> {
-    return this.request<StatusResponse>(ENDPOINTS.HARD_RESET, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId } as UserIdRequest),
-    });
-  }
+  getSessionMessages = (userId: string, sessionId: string) =>
+    this.request<{ messages: Array<{ user?: string; ai?: string; ts?: string }> }>(ENDPOINTS.GET_SESSION_MESSAGES, { method: 'POST', body: JSON.stringify({ user_id: userId, session_id: sessionId }) });
 
-  async reset(userId: string): Promise<APIResponse<StatusResponse>> {
-    return this.request<StatusResponse>(ENDPOINTS.RESET, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId } as UserIdRequest),
-    });
-  }
+  sendMessage = (message: string, userId: string, sessionId: string) =>
+    this.request<ChatResponse>(ENDPOINTS.CHAT, { method: 'POST', body: JSON.stringify({ message, user_id: userId, session_id: sessionId }) });
 
-  // History
-  async getHistory(userId: string): Promise<APIResponse<HistoryResponse>> {
-    return this.request<HistoryResponse>(ENDPOINTS.GET_HISTORY, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId } as UserIdRequest),
-    });
-  }
+  getInitialMessage = (userId: string, sessionId: string) =>
+    this.request<InitialMessageResponse>(ENDPOINTS.GET_INITIAL_MESSAGE, { method: 'POST', body: JSON.stringify({ user_id: userId, session_id: sessionId }) });
 
-  async storeQuestionInfo(message: string, userId: string): Promise<APIResponse<StatusResponse>> {
-    return this.request<StatusResponse>(ENDPOINTS.STORE_QUESTION_INFO, {
-      method: 'POST',
-      body: JSON.stringify({ message, user_id: userId } as ChatRequest),
-    });
-  }
+  getQuoteThought = (emotion: string) =>
+    this.request<EmotionReplyResponse>(ENDPOINTS.GET_QUOTE_THOUGHT, { method: 'POST', body: JSON.stringify({ emotion } as EmotionRequest) });
 
-  async getMoodAnalytics(userId: string): Promise<APIResponse<MoodAnalyticsResponse>> {
-    return this.request<MoodAnalyticsResponse>(ENDPOINTS.GET_MOOD_ANALYTICS, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId } as UserIdRequest),
-    });
-  }
+  appExit = (userId: string, sessionId: string) =>
+    this.request<AppExitResponse>(ENDPOINTS.APP_EXIT, { method: 'POST', body: JSON.stringify({ user_id: userId, session_id: sessionId }) });
 
-  async uploadDocument(file: File, userId: string): Promise<APIResponse<{ status: string; chunks: number }>> {
+  hardReset = (userId: string, sessionId: string) =>
+    this.request<StatusResponse>(ENDPOINTS.HARD_RESET, { method: 'POST', body: JSON.stringify({ user_id: userId, session_id: sessionId }) });
+
+  reset = (userId: string, sessionId: string) =>
+    this.request<StatusResponse>(ENDPOINTS.RESET, { method: 'POST', body: JSON.stringify({ user_id: userId, session_id: sessionId }) });
+
+  getMoodAnalytics = (userId: string) =>
+    this.request<MoodAnalyticsResponse>(ENDPOINTS.GET_MOOD_ANALYTICS, { method: 'POST', body: JSON.stringify({ user_id: userId } as UserIdRequest) });
+
+  getNotifications = (userId: string) =>
+    this.request<{ notifications: Array<{ timestamp: string; notification_message: string }> }>(ENDPOINTS.GET_NOTIFICATIONS, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+
+  async uploadDocument(file: File, userId: string, sessionId: string): Promise<APIResponse<{ status: string; chunks: number }>> {
     const form = new FormData();
     form.append('file', file);
     form.append('user_id', userId);
+    form.append('session_id', sessionId);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
       const res = await fetch(`${this.baseURL}${ENDPOINTS.UPLOAD_DOCUMENT}`, { method: 'POST', body: form, signal: controller.signal });
       clearTimeout(timeoutId);
-      const data = await res.json();
-      return { data, status: res.status };
+      return { data: await res.json(), status: res.status };
     } catch (e) {
       clearTimeout(timeoutId);
       return { error: e instanceof Error ? e.message : 'Upload failed', status: 500 };

@@ -1,41 +1,46 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { useChatStore } from '../store/chatStore';
 import { useUserStore } from '../store/userStore';
 
-export function useChat() {
-  const { messages, addMessage, setLoading, setError, isLoading, error } = useChatStore();
+export function useChat(sessionId: string) {
+  const { messages, addMessage, setMessages, setLoading, setError, setTyping, isLoading, isTyping, error } = useChatStore();
   const { userId, setEmotion, setSentiment } = useUserStore();
-  const [isTyping, setIsTyping] = useState(false);
+
+  const loadMessages = useCallback(async () => {
+    if (!userId || !sessionId) return;
+    const res = await apiClient.getSessionMessages(userId, sessionId);
+    if (res.data?.messages) setMessages(res.data.messages);
+  }, [userId, sessionId, setMessages]);
 
   const sendMessage = useCallback(async (message: string) => {
-    if (!userId || !message.trim()) return;
+    if (!userId || !sessionId || !message.trim()) return;
     setLoading(true);
     setError(null);
     addMessage({ user: message });
     try {
-      const response = await apiClient.sendMessage(message, userId);
-      if (response.error || !response.data) { setError(response.error || 'Failed to send message'); return; }
-      setIsTyping(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setIsTyping(false);
+      const response = await apiClient.sendMessage(message, userId, sessionId);
+      if (response.error || !response.data) { setError(response.error || 'Failed'); return; }
+      setTyping(true);
+      await new Promise(r => setTimeout(r, 500));
+      setTyping(false);
       addMessage({ ai: response.data.reply });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [userId, addMessage, setLoading, setError]);
+  }, [userId, sessionId, addMessage, setLoading, setError, setTyping]);
 
   const getInitialMessage = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !sessionId) return;
     setLoading(true);
     try {
-      const response = await apiClient.getInitialMessage(userId);
+      const response = await apiClient.getInitialMessage(userId, sessionId);
       if (response.data?.message) {
-        setIsTyping(true);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setIsTyping(false);
+        setTyping(true);
+        await new Promise(r => setTimeout(r, 500));
+        setTyping(false);
         addMessage({ ai: response.data.message });
       }
     } catch (err) {
@@ -43,19 +48,19 @@ export function useChat() {
     } finally {
       setLoading(false);
     }
-  }, [userId, addMessage, setLoading, setError]);
+  }, [userId, sessionId, addMessage, setLoading, setError, setTyping]);
 
   const appExit = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !sessionId) return;
     try {
-      const response = await apiClient.appExit(userId);
+      const response = await apiClient.appExit(userId, sessionId);
       if (response.data?.emotion_sentiment) {
         const [emotion, sentiment] = response.data.emotion_sentiment;
         setEmotion(emotion);
         setSentiment(sentiment);
       }
     } catch (_) {}
-  }, [userId, setEmotion, setSentiment]);
+  }, [userId, sessionId, setEmotion, setSentiment]);
 
-  return { messages, sendMessage, getInitialMessage, appExit, isLoading, isTyping, error };
+  return { messages, sendMessage, getInitialMessage, loadMessages, appExit, isLoading, isTyping, error };
 }

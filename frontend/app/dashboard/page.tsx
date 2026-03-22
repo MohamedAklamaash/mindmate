@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { MessageSquare, History, TrendingUp, Settings, LogOut, Brain, Sparkles } from 'lucide-react';
@@ -8,22 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUserStore } from '@/lib/store/userStore';
-import { useChatStore } from '@/lib/store/chatStore';
+import { apiClient } from '@/lib/api/client';
 import Link from 'next/link';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { userName, isAuthenticated, clearUser } = useUserStore();
-  const { messages } = useChatStore();
+  const { userId } = useUserStore();
+  const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/');
-  }, [isAuthenticated, router]);
-
-  if (!isAuthenticated) return null;
-
-  const userMessages = messages.filter((m) => m.user).length;
-  const aiMessages = messages.filter((m) => m.ai).length;
+    if (!isAuthenticated) { router.push('/'); return; }
+    if (userId) apiClient.getSessions(userId).then(r => { if (r.data?.sessions) setSessionCount(r.data.sessions.length); });
+  }, [isAuthenticated, router, userId]);
 
   const features = [
     { icon: MessageSquare, title: 'Start Chat', description: 'Begin a conversation with your AI companion', href: '/chat', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
@@ -102,19 +99,19 @@ export default function DashboardPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="glass border-0">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-primary">{userMessages}</p>
-              <p className="text-sm text-muted-foreground">Messages Sent</p>
+              <p className="text-3xl font-bold text-primary">{sessionCount}</p>
+              <p className="text-sm text-muted-foreground">Total Sessions</p>
             </CardContent>
           </Card>
           <Card className="glass border-0">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-secondary">{aiMessages}</p>
-              <p className="text-sm text-muted-foreground">AI Responses</p>
+              <p className="text-3xl font-bold text-secondary">—</p>
+              <p className="text-sm text-muted-foreground">Insights</p>
             </CardContent>
           </Card>
           <Card className="glass border-0">
             <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-accent">{messages.length > 0 ? 1 : 0}</p>
+              <p className="text-3xl font-bold text-accent">—</p>
               <p className="text-sm text-muted-foreground">Active Sessions</p>
             </CardContent>
           </Card>

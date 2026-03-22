@@ -6,28 +6,22 @@ export const API_CONFIG = {
 } as const;
 
 export const ENDPOINTS = {
-  // Health & Info
   HEALTH: '/',
-  TEST: '/test',
-  ENDPOINTS_LIST: '/endpoints',
   MODEL_INFO: '/info',
-  
-  // Chat
+  REGISTER: '/register',
+  GET_USER: '/get-user',
   CHAT: '/chat',
   GET_INITIAL_MESSAGE: '/get-initial-message',
-  
-  // Emotions
   GET_QUOTE_THOUGHT: '/get-quote-thought',
-  
-  // Session
   APP_EXIT: '/app-exit',
   HARD_RESET: '/hard-reset',
   RESET: '/reset',
-  
-  // History
-  GET_HISTORY: '/get-history',
-  STORE_QUESTION_INFO: '/store-question-info',
+  CREATE_SESSION: '/create-session',
+  GET_SESSIONS: '/get-sessions',
+  DELETE_SESSION: '/delete-session',
+  GET_SESSION_MESSAGES: '/get-session-messages',
   GET_MOOD_ANALYTICS: '/get-mood-analytics',
+  GET_NOTIFICATIONS: '/get-notifications',
   UPLOAD_DOCUMENT: '/upload-document',
 } as const;
 
