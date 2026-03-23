@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, User, Shield, Bell, Trash2, Download, LogOut } from 'lucide-react';
@@ -8,24 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useUserStore } from '@/lib/store/userStore';
-import { useChatStore } from '@/lib/store/chatStore';
+import { useAuthGuard } from '@/lib/hooks/useAuthGuard';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, userName, clearUser } = useUserStore();
-  const { clearMessages } = useChatStore();
+  const { userName, clearUser } = useUserStore();
+  const { ready } = useAuthGuard();
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/');
-    }
-  }, [isAuthenticated, router]);
+  if (!ready) return null;
 
   const handleClearHistory = () => {
-    clearMessages();
-    toast.success('Conversation history cleared');
+    toast.info('Clear history from the chat sidebar.');
   };
 
   const handleExportData = () => {
@@ -36,8 +30,6 @@ export default function SettingsPage() {
     clearUser();
     router.push('/');
   };
-
-  if (!isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">

@@ -7,33 +7,43 @@ import { ArrowLeft, MessageSquare, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useUserStore } from '@/lib/store/userStore';
+import { useAuthGuard } from '@/lib/hooks/useAuthGuard';
 import { apiClient } from '@/lib/api/client';
 import type { ChatMessage } from '@/lib/types/api';
 import Link from 'next/link';
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { isAuthenticated, userId } = useUserStore();
+  const { userId } = useUserStore();
+  const { ready } = useAuthGuard();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/'); return; }
+    if (!ready) return;
     fetchHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [ready]);
+
+  if (!ready) return null;
 
   const fetchHistory = async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      const res = await apiClient.getHistory(userId);
-      if (res.data?.history?.messages) setMessages(res.data.history.messages);
+      const res = await apiClient.getSessions(userId);
+      if (res.data?.sessions) {
+        // Flatten all sessions into a message list for history view
+        const allMessages: ChatMessage[] = [];
+        for (const session of res.data.sessions.slice(0, 10)) {
+          const msgRes = await apiClient.getSessionMessages(userId, session.id);
+          if (msgRes.data?.messages) allMessages.push(...msgRes.data.messages);
+        }
+        setMessages(allMessages);
+      }
     } catch (_) {}
     finally { setLoading(false); }
   };
-
-  if (!isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">

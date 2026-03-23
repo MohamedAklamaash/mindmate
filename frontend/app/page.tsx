@@ -12,8 +12,14 @@ import { apiClient } from '@/lib/api/client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser } = useUserStore();
+  const { setUser, isAuthenticated } = useUserStore();
   const [name, setName] = useState('');
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => { setHydrated(true); }, []);
+  useEffect(() => { if (hydrated && isAuthenticated) router.replace('/dashboard'); }, [hydrated, isAuthenticated, router]);
+
+  if (!hydrated || isAuthenticated) return null;
 
   const handleLogin = () => {
     if (!name.trim()) return;

@@ -7,6 +7,7 @@ import { ArrowLeft, Heart, TrendingUp, Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUserStore } from '@/lib/store/userStore';
+import { useAuthGuard } from '@/lib/hooks/useAuthGuard';
 import { apiClient } from '@/lib/api/client';
 import { QuoteCard } from '@/components/insights/QuoteCard';
 import type { EmotionReplyResponse, MoodEntry } from '@/lib/types/api';
@@ -14,7 +15,8 @@ import Link from 'next/link';
 
 export default function InsightsPage() {
   const router = useRouter();
-  const { isAuthenticated, userId, emotion, sentiment } = useUserStore();
+  const { userId, emotion, sentiment } = useUserStore();
+  const { ready } = useAuthGuard();
   const [quote, setQuote] = useState<EmotionReplyResponse | null>(null);
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [dominantEmotion, setDominantEmotion] = useState<string | null>(null);
@@ -23,11 +25,13 @@ export default function InsightsPage() {
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/'); return; }
+    if (!ready) return;
     fetchAnalytics();
     if (emotion) fetchQuote(emotion);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, emotion]);
+  }, [ready, emotion]);
+
+  if (!ready) return null;
 
   const fetchAnalytics = async () => {
     if (!userId) return;

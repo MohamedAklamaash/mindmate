@@ -8,19 +8,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUserStore } from '@/lib/store/userStore';
+import { useAuthGuard } from '@/lib/hooks/useAuthGuard';
 import { apiClient } from '@/lib/api/client';
 import Link from 'next/link';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { userName, isAuthenticated, clearUser } = useUserStore();
-  const { userId } = useUserStore();
+  const { userName, clearUser, userId } = useUserStore();
+  const { ready } = useAuthGuard();
   const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/'); return; }
-    if (userId) apiClient.getSessions(userId).then(r => { if (r.data?.sessions) setSessionCount(r.data.sessions.length); });
-  }, [isAuthenticated, router, userId]);
+    if (ready && userId) apiClient.getSessions(userId).then(r => { if (r.data?.sessions) setSessionCount(r.data.sessions.length); });
+  }, [ready, userId]);
+
+  if (!ready) return null;
 
   const features = [
     { icon: MessageSquare, title: 'Start Chat', description: 'Begin a conversation with your AI companion', href: '/chat', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },

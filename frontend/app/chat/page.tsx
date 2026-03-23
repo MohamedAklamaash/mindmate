@@ -10,6 +10,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { useUserStore } from '@/lib/store/userStore';
 import { useChatStore } from '@/lib/store/chatStore';
 import { useChat } from '@/lib/hooks/useChat';
+import { useAuthGuard } from '@/lib/hooks/useAuthGuard';
 import { apiClient } from '@/lib/api/client';
 import type { Session } from '@/lib/types/api';
 import { toast } from 'sonner';
@@ -18,6 +19,7 @@ import Link from 'next/link';
 export default function ChatPage() {
   const router = useRouter();
   const { isAuthenticated, userId, userName } = useUserStore();
+  const { ready } = useAuthGuard();
   const { clearMessages } = useChatStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -30,10 +32,10 @@ export default function ChatPage() {
   const { messages, sendMessage, getInitialMessage, loadMessages, appExit, isLoading, isTyping } = useChat(activeSessionId ?? '');
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/'); return; }
+    if (!ready) return;
     loadSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [ready]);
 
   useEffect(() => {
     if (!activeSessionId) return;
@@ -112,7 +114,7 @@ export default function ChatPage() {
     e.target.value = '';
   };
 
-  if (!isAuthenticated) return null;
+  if (!ready) return null;
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden">
