@@ -202,21 +202,23 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="flex flex-col flex-1 min-h-0">
-            {uploadedFile && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border-b text-sm shrink-0">
-                <FileText className="w-4 h-4 text-primary" />
-                <span className="flex-1 truncate text-muted-foreground">{uploadedFile}</span>
-                <button onClick={() => setUploadedFile(null)}><X className="w-4 h-4 text-muted-foreground" /></button>
-              </div>
-            )}
             <MessageList messages={messages} isTyping={isTyping} />
-            <div className="flex items-end gap-2 px-4 pb-1 shrink-0">
-              <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" className="hidden" onChange={handleFileChange} />
-              <Button variant="ghost" size="icon" className="shrink-0 mb-1" onClick={() => fileRef.current?.click()} disabled={uploading} title="Upload document">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-              </Button>
-              <div className="flex-1">
-                <ChatInput onSend={sendMessage} disabled={isLoading} />
+            <div className="shrink-0 border-t glass">
+              {uploadedFile && (
+                <div className="flex items-center gap-2 px-4 pt-2 text-xs">
+                  <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="flex-1 truncate text-muted-foreground">{uploadedFile} — ready to discuss</span>
+                  <button onClick={() => setUploadedFile(null)}><X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" /></button>
+                </div>
+              )}
+              <div className="flex items-end gap-2 px-4 pb-1 pt-1">
+                <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" className="hidden" onChange={handleFileChange} />
+                <Button variant="ghost" size="icon" className="shrink-0 mb-1" onClick={() => fileRef.current?.click()} disabled={uploading} title="Upload document">
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className={`w-4 h-4 ${uploadedFile ? 'text-primary' : ''}`} />}
+                </Button>
+                <div className="flex-1">
+                  <ChatInput onSend={(msg) => { sendMessage(msg); setUploadedFile(null); }} disabled={isLoading} />
+                </div>
               </div>
             </div>
           </div>

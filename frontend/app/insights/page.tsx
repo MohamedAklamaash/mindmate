@@ -23,6 +23,7 @@ export default function InsightsPage() {
   const [sentimentTrend, setSentimentTrend] = useState<string | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const { isAuthenticated } = useUserStore();
 
   useEffect(() => {
     if (!ready) return;
@@ -43,7 +44,7 @@ export default function InsightsPage() {
         setDominantEmotion(res.data.analytics.dominant_emotion);
         setSentimentTrend(res.data.analytics.sentiment_trend);
       }
-    } catch (_) {}
+    } catch (_) { }
     finally { setLoadingAnalytics(false); }
   };
 
@@ -52,7 +53,7 @@ export default function InsightsPage() {
     try {
       const res = await apiClient.getQuoteThought(e);
       if (res.data) setQuote(res.data);
-    } catch (_) {}
+    } catch (_) { }
     finally { setLoadingQuote(false); }
   };
 
