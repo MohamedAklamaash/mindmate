@@ -30,7 +30,13 @@ export const useUserStore = create<UserState>()(
     }),
     {
       name: USER_ID_KEY,
-      partialize: (state) => ({ userId: state.userId, userName: state.userName, isAuthenticated: state.isAuthenticated }),
+      partialize: (state) => ({
+        userId: state.userId,
+        userName: state.userName,
+        isAuthenticated: state.isAuthenticated,
+        emotion: state.emotion,
+        sentiment: state.sentiment,
+      }),
     }
   )
 );

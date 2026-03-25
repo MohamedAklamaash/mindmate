@@ -14,12 +14,20 @@ import Link from 'next/link';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { userName, clearUser, userId } = useUserStore();
+  const { userName, clearUser, userId, setEmotion, setSentiment } = useUserStore();
   const { ready } = useAuthGuard();
   const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    if (ready && userId) apiClient.getSessions(userId).then(r => { if (r.data?.sessions) setSessionCount(r.data.sessions.length); });
+    if (!ready || !userId) return;
+    apiClient.getSessions(userId).then(r => {
+      if (r.data?.sessions) {
+        setSessionCount(r.data.sessions.length);
+        const latest = r.data.sessions[0];
+        if (latest?.emotion) setEmotion(latest.emotion);
+        if (latest?.sentiment) setSentiment(latest.sentiment);
+      }
+    });
   }, [ready, userId]);
 
   if (!ready) return null;
