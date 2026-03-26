@@ -118,7 +118,7 @@ class ChatBot:
                 total_chars += len(ctx)
         return int(total_chars / 2.5)
 
-    def app_exit(self, user_id: str) -> tuple:
+    def app_exit(self, user_id: str, real_user_id: str = None) -> tuple:
         try:
             user_data = self._get_user_data(user_id)
             if user_data['messages']:
@@ -132,6 +132,11 @@ class ChatBot:
                     user_data['previous_insights'].append(result.insights)
                     if result.insights.important_dates:
                         user_data['notification'].append(result.insights.important_dates)
+                # Persist summary+insights to PostgreSQL under the real user_id
+                try:
+                    self.db.insert_local_summary(result, real_user_id or user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to persist summary to PostgreSQL: {e}")
             notifications_list = self.get_notification(user_data['notification'])
             emotion, sentiment = self.get_emotion_sentiment(user_id)
             user_data['notification'] = []

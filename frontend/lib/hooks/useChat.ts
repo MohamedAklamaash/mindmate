@@ -56,8 +56,8 @@ export function useChat(sessionId: string) {
       const response = await apiClient.appExit(userId, sessionId);
       if (response.data?.emotion_sentiment) {
         const [emotion, sentiment] = response.data.emotion_sentiment;
-        setEmotion(emotion);
-        setSentiment(sentiment);
+        if (emotion) setEmotion(emotion);
+        if (sentiment) setSentiment(sentiment);
       }
     } catch (_) {}
   }, [userId, sessionId, setEmotion, setSentiment]);

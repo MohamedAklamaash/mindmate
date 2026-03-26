@@ -178,7 +178,7 @@ async def chat_endpoint(req: ChatRequest):
 @app.post("/app-exit")
 async def app_exit(req: SessionRequest):
     try:
-        notifications, emotion_sentiment = bot.app_exit(req.session_id)
+        notifications, emotion_sentiment = bot.app_exit(req.session_id, req.user_id)
         emotion, sentiment = emotion_sentiment if emotion_sentiment else (None, None)
         bot.db.update_session_meta(req.session_id, emotion=emotion, sentiment=sentiment)
         bot.db.store_notifications(req.user_id, req.session_id, notifications)
