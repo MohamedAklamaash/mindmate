@@ -25,6 +25,7 @@ class ChatBot:
                 'previous_insights': [],
                 'previous_summary': [],
                 'notification': [],
+                'question_info': None,
                 'initial_message': True
             }
         return self._user_data[user_id]
@@ -40,7 +41,9 @@ class ChatBot:
             self._user_data[user_id]['initial_message'] = True
 
     def store_question_info(self, user_id: str, question_info: str):
-        self._get_user_data(user_id)['question_info'] = question_info
+        user_data = self._get_user_data(user_id)
+        existing = user_data.get('question_info') or ''
+        user_data['question_info'] = (existing + '\n\n' + question_info).strip()
 
     def classify_category(self, user_query: str, user_id: str, chat_history: Optional[List[Any]] = None) -> str:
         user_data = self._get_user_data(user_id)
@@ -141,6 +144,7 @@ class ChatBot:
             emotion, sentiment = self.get_emotion_sentiment(user_id)
             user_data['notification'] = []
             user_data['messages'] = []
+            user_data['question_info'] = None
             try:
                 self.db.store_notifications(user_id, notifications_list)
                 self.db.store_session(user_id, {"emotion": emotion, "sentiment": sentiment, "notification_count": len(notifications_list)})
@@ -230,19 +234,20 @@ class ChatBot:
             user_data['previous_summary'] = user_data['previous_summary'][:-items_to_remove]
             user_data['previous_insights'] = user_data['previous_insights'][:-items_to_remove]
 
-    def hard_reset(self, user_id: str):
+    def hard_reset(self, user_id: str, real_user_id: str = None):
         try:
             user_data = self._get_user_data(user_id)
+            db_user_id = real_user_id or user_id
             min_length = min(len(user_data['previous_summary']), len(user_data['previous_insights']))
             for i in range(min_length):
                 self.db.insert_local_summary(
                     PersonalSummary(summary=user_data['previous_summary'][i], insights=user_data['previous_insights'][i]),
-                    user_id
+                    db_user_id
                 )
             if user_data['messages']:
                 summary = self.summarize(user_id)
                 if summary:
-                    self.db.insert_local_summary(summary, user_id)
+                    self.db.insert_local_summary(summary, db_user_id)
         except Exception as e:
             logger.warning(f"hard_reset failed for {user_id}: {e}")
         finally:
@@ -251,6 +256,7 @@ class ChatBot:
             user_data['previous_summary'] = []
             user_data['previous_insights'] = []
             user_data['notification'] = []
+            user_data['question_info'] = None
             user_data['initial_message'] = True
 
     def model_info(self) -> Dict:
@@ -270,6 +276,7 @@ class ChatBot:
         user_data['previous_summary'] = []
         user_data['previous_insights'] = []
         user_data['notification'] = []
+        user_data['question_info'] = None
         user_data['initial_message'] = True
 
 

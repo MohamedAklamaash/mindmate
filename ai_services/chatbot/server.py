@@ -197,7 +197,7 @@ async def reset(req: SessionRequest):
 @app.post("/hard-reset")
 async def hard_reset(req: SessionRequest):
     try:
-        bot.hard_reset(req.session_id)
+        bot.hard_reset(req.session_id, req.user_id)
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "error": str(e)}

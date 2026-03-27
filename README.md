@@ -59,41 +59,6 @@ MindMate/
 
 ---
 
-## Tech stack
-
-### AI Services (backend)
-
-| Layer | Technology |
-|---|---|
-| Framework | FastAPI |
-| AI Model | Google Gemini 2.5 Flash via `google-genai` |
-| Primary database | PostgreSQL 17 — session summaries, emotion/sentiment insights |
-| Secondary database | MongoDB 7 — notifications, chat session metadata |
-| Config | `config.yaml` for model params; secrets via `.env` / environment variables |
-| Validation | Pydantic v2 |
-| Server | Uvicorn |
-| Containerization | Docker |
-
-Key design decisions:
-- `ChatCompletionBase` wraps the Gemini API and handles both free-text and structured (JSON schema) responses
-- `PromptManager` classifies each message into a mental health category and selects a specialized system prompt
-- Context is automatically compressed when it approaches the model's token limit — oldest 20% of messages are summarized and stored
-- At session end (`/app-exit`), the full conversation is summarized, emotion/sentiment is extracted, and notifications are persisted to MongoDB
-
-### Frontend
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS v4 |
-| UI components | shadcn/ui |
-| Animations | Framer Motion |
-| State management | Zustand |
-| Icons | Lucide React |
-
----
-
 ## Getting started
 
 ### Prerequisites

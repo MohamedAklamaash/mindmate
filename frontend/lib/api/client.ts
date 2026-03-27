@@ -2,7 +2,7 @@ import { API_CONFIG, ENDPOINTS } from '../constants';
 import type {
   APIResponse, ChatRequest, ChatResponse, UserIdRequest,
   EmotionRequest, EmotionReplyResponse, InitialMessageResponse,
-  AppExitResponse, StatusResponse, HealthCheckResponse,
+  AppExitResponse, HealthCheckResponse,
   ModelInfoResponse, MoodAnalyticsResponse, Session,
 } from '../types/api';
 

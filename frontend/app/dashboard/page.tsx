@@ -28,6 +28,7 @@ export default function DashboardPage() {
         if (latest?.sentiment) setSentiment(latest.sentiment);
       }
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, userId]);
 
   if (!ready) return null;
