@@ -73,8 +73,8 @@ class ServerDB:
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO summaries (user_id, session_id, summary, insights) VALUES (%s, %s, %s, %s)",
-                        (user_id, session_id, payload["summary"], json.dumps(payload.get("insights", {})))
+                        "INSERT INTO summaries (user_id, summary, insights) VALUES (%s, %s, %s)",
+                        (user_id, payload["summary"], json.dumps(payload.get("insights", {})))
                     )
                 conn.commit()
             return True
@@ -117,6 +117,7 @@ class ServerDB:
         return deleted
 
     def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
+        # Postgres summaries table is populated on session exit; fall through to Mongo if empty
         start_time = datetime.now() - timedelta(days=days)
         with _get_pg_conn() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -227,6 +228,22 @@ class SessionDB:
             logger.warning(f"get_notifications failed: {e}")
             return []
 
+    def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
+        try:
+            start_time = datetime.utcnow() - timedelta(days=days)
+            db = _get_mongo_db()
+            sessions = list(db.chat_sessions.find(
+                {"user_id": user_id, "updated_at": {"$gte": start_time}, "emotion": {"$ne": None}, "sentiment": {"$ne": None}},
+                {"emotion": 1, "sentiment": 1, "updated_at": 1}
+            ).sort("updated_at", -1))
+            return [
+                {"date": s["updated_at"].strftime("%Y-%m-%d"), "emotion": s["emotion"], "sentiment": s["sentiment"]}
+                for s in sessions
+            ]
+        except Exception as e:
+            logger.warning(f"SessionDB.get_mood_analytics failed: {e}")
+            return []
+
 
 class DB:
     def __init__(self, config_path: str = None):
@@ -252,7 +269,11 @@ class DB:
         return self.local_db.delete_summaries_last_n_days(days, user_id)
 
     def get_mood_analytics(self, days: int, user_id: str) -> List[Dict]:
-        return self.local_db.get_mood_analytics(days, user_id)
+        # Prefer Mongo sessions (always populated); fall back to Postgres summaries
+        data = self.session_db.get_mood_analytics(days, user_id)
+        if not data:
+            data = self.local_db.get_mood_analytics(days, user_id)
+        return data
 
     # Session passthrough
     def create_session(self, user_id: str, title: str = "New Chat") -> str:

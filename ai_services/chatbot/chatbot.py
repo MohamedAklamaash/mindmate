@@ -145,11 +145,6 @@ class ChatBot:
             user_data['notification'] = []
             user_data['messages'] = []
             user_data['question_info'] = None
-            try:
-                self.db.store_notifications(user_id, notifications_list)
-                self.db.store_session(user_id, {"emotion": emotion, "sentiment": sentiment, "notification_count": len(notifications_list)})
-            except Exception as e:
-                logger.warning(f"MongoDB persist failed for {user_id}: {e}")
             return notifications_list, (emotion, sentiment)
         except Exception as e:
             logger.warning(f"app_exit failed for {user_id}: {e}")
