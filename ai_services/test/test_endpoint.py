@@ -1,7 +1,4 @@
-"""
-Tests for MindMate AI backend.
-Requires: GOOGLE_API_KEY, POSTGRES_DB_URL, MONGODB_URL env vars (or .env file).
-"""
+
 import os
 import sys
 import pytest
