@@ -1,6 +1,6 @@
 # MindMate
 
-MindMate is an AI-powered mental health companion that provides empathetic, context-aware conversational support. It tracks emotional patterns over time, surfaces personalized insights, and reminds users of important dates they've shared — all through a clean, calming interface.
+An AI-powered mental health companion that holds emotionally intelligent conversations, tracks your mood over time, and surfaces personalized insights — all through a clean, calming interface.
 
 > MindMate is not a replacement for professional mental health care. If you are in crisis, please contact a qualified healthcare provider or emergency services.
 
@@ -8,144 +8,85 @@ MindMate is an AI-powered mental health companion that provides empathetic, cont
 
 ## What it does
 
-- Holds emotionally intelligent conversations powered by Google Gemini 2.5 Flash
-- Automatically classifies the mental health topic of each message (anxiety, grief, stress, etc.) and adapts its tone accordingly
-- Summarizes and compresses conversation history as context grows, so long sessions stay coherent
+- Conversations powered by **Google Gemini 2.5 Flash** that adapt tone based on the detected mental health topic (anxiety, grief, stress, etc.)
+- Summarizes and compresses conversation history automatically so long sessions stay coherent
 - Detects dominant emotion and sentiment at the end of each session and persists them to PostgreSQL
 - Extracts important dates mentioned in conversation (e.g. "my exam is on Friday") and stores them as notifications in MongoDB
 - Surfaces mood analytics — dominant emotion, sentiment trend, and 30-day history — on the insights page
-- Generates personalized inspirational quotes and reflections based on the user's current emotional state
+- Generates personalized inspirational quotes and reflections based on your current emotional state
+- Multi-session chat (ChatGPT-style) with full history per session
+- Upload documents (PDF, DOCX, TXT) to give the AI additional context
 
 ---
 
-## Project structure
+## Stack
 
-```
-MindMate/
-├── ai_services/          # FastAPI backend + AI logic
-│   ├── chatbot/
-│   │   ├── server.py         # FastAPI app and all endpoints
-│   │   ├── chatbot.py        # ChatBot orchestrator
-│   │   ├── chat.py           # Gemini API wrapper (ChatCompletionBase)
-│   │   ├── db.py             # PostgreSQL (ServerDB) + MongoDB (NotificationDB)
-│   │   ├── prompt_manager.py # Category classification and prompt selection
-│   │   ├── custom_promt.py   # System prompts
-│   │   ├── structures.py     # Pydantic models
-│   │   └── config.yaml       # Non-secret config (model params, thresholds)
-│   ├── test/
-│   │   └── test_endpoint.py
-│   ├── .env.example
-│   ├── requirements.txt
-│   └── Dockerfile
-│
-└── frontend/             # Next.js 15 frontend
-    ├── app/
-    │   ├── page.tsx          # Login / role selection
-    │   ├── dashboard/        # Home dashboard
-    │   ├── chat/             # Chat interface
-    │   ├── history/          # Conversation history
-    │   ├── insights/         # Mood and emotion insights
-    │   └── settings/         # Account and data settings
-    ├── components/
-    │   ├── chat/             # ChatInterface, MessageList, ChatInput
-    │   ├── insights/         # QuoteCard
-    │   └── ui/               # shadcn/ui primitives
-    └── lib/
-        ├── api/              # API client (typed fetch wrapper)
-        ├── store/            # Zustand stores (user, chat)
-        ├── hooks/            # useChat
-        └── types/            # API response types
-```
+| Layer | Tech |
+|---|---|
+| AI backend | FastAPI + Langchain |
+| Frontend | Next.js 15 + Tailwind + shadcn/ui |
+| Relational DB | PostgreSQL (mood summaries, users) |
+| Document DB | MongoDB (chat sessions, notifications) |
 
 ---
 
-## Getting started
+## Quick start
 
-### Prerequisites
+**Prerequisites:** Python 3.11+, Node.js 18+, running PostgreSQL (port 5433) and MongoDB (port 27017) instances, Google Gemini API key.
 
-- Python 3.11+
-- Node.js 18+
-- Google Gemini API key
-- Running PostgreSQL instance (port 5433) with a `mindmate` database
-- Running MongoDB instance (port 27017) with a `mindmate` database
+```bash
+git clone <repo>
+cd MindMate
+./start.sh
+```
 
-### Backend
+Or manually:
 
 ```bash
 cd ai_services
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in your values
-uvicorn chatbot.server:app --host 0.0.0.0 --port 8000 --reload
-```
+cp .env.example .env
+cd chatbot
+uvicorn server:app --host 0.0.0.0 --port 9000 --reload
 
-### Frontend
-
-```bash
 cd frontend
 npm install
-# .env.local already has NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Or run both with:
-
-```bash
-./start.sh
-```
+Frontend runs at `http://localhost:3000`, backend at `http://localhost:9000`.
 
 ---
 
 ## Environment variables
 
-### `ai_services/.env`
-
+**`ai_services/.env`**
 ```env
 GOOGLE_API_KEY=your_gemini_api_key
 POSTGRES_DB_URL=postgresql://user:password@localhost:5433/mindmate
 MONGODB_URL=mongodb://user:password@localhost:27017/mindmate?authSource=admin
 ```
 
-### `frontend/.env.local`
-
+**`frontend/.env.local`**
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:9000
 ```
-
----
-
-## API endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/` | Health check |
-| GET | `/info` | Model info |
-| GET | `/endpoints` | List all endpoints |
-| POST | `/chat` | Send message, get AI reply |
-| POST | `/get-initial-message` | Get personalized greeting |
-| POST | `/get-quote-thought` | Get quote + reflection by emotion |
-| POST | `/app-exit` | Summarize session, persist to DB |
-| POST | `/hard-reset` | Save everything and clear all state |
-| POST | `/reset` | Clear conversation only |
-| POST | `/get-history` | Retrieve conversation history |
-| POST | `/store-question-info` | Store question metadata |
-| POST | `/get-mood-analytics` | 30-day mood analytics |
 
 ---
 
 ## Deployment
 
-### Backend (Docker)
-
+**Backend (Docker)**
 ```bash
 cd ai_services
 docker build -t mindmate-ai .
-docker run -p 8000:8000 --env-file .env mindmate-ai
+docker run -p 9000:9000 --env-file .env mindmate-ai
 ```
 
-### Frontend (Vercel)
-
+**Frontend (Vercel)**
 1. Push to GitHub
-2. Import in Vercel
-3. Set `NEXT_PUBLIC_API_URL` to your backend URL
-4. Deploy
+2. Import in Vercel, set `NEXT_PUBLIC_API_URL` to your backend URL
+3. Deploy
+
+See [`ai_services/README.md`](ai_services/README.md) and [`frontend/README.md`](frontend/README.md) for detailed docs on each service.
